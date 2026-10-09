@@ -101,6 +101,12 @@ class CleaningEngine:
         self.workers.clear()
 
     async def queue_account_clean(self, account_id: int, mode: str = "FULL_CLEAN", selected_peer_ids: Optional[List[str]] = None) -> str:
+        # Prevent duplicate tasks for the same account if one is already active or queued
+        for existing in self.active_tasks.values():
+            if existing.account_id == account_id and existing.state in ["PENDING", "RUNNING", "PAUSED"]:
+                logger.warning(f"Account {account_id} already has active task {existing.job_id}. Reusing.")
+                return existing.job_id
+
         job_id = f"job_{uuid.uuid4().hex[:10]}"
         task = CleaningTask(job_id, account_id, mode, selected_peer_ids)
         self.active_tasks[job_id] = task

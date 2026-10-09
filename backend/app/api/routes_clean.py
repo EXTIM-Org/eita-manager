@@ -117,12 +117,22 @@ async def start_cleaning(req: StartCleanRequest, db: AsyncSession = Depends(get_
         raise HTTPException(status_code=400, detail="هیچ حسابی برای پاکسازی انتخاب نشده است.")
 
     job_ids = []
+    already_active_count = 0
     for acc_id in req.account_ids:
         acc_res = await db.execute(select(Account).where(Account.id == acc_id))
         account = acc_res.scalar_one_or_none()
         if not account:
             continue
         if account.status == "NEEDS_REAUTH":
+            continue
+
+        # Prevent duplicate tasks for the same account
+        is_already_active = any(
+            t.account_id == acc_id and t.state in ["PENDING", "RUNNING", "PAUSED"]
+            for t in cleaner_engine.active_tasks.values()
+        )
+        if is_already_active:
+            already_active_count += 1
             continue
 
         job_id = await cleaner_engine.queue_account_clean(
@@ -132,13 +142,17 @@ async def start_cleaning(req: StartCleanRequest, db: AsyncSession = Depends(get_
         )
         job_ids.append(job_id)
 
+    msg = f"{len(job_ids)} حساب کاربری در صف پاکسازی قرار گرفتند."
+    if already_active_count > 0:
+        msg += f" ({already_active_count} حساب از قبل در حال پردازش بود)"
+
     return {
         "success": True,
         "data": {
             "job_ids": job_ids,
             "queued_count": len(job_ids)
         },
-        "message": f"{len(job_ids)} حساب کاربری در صف پاکسازی قرار گرفتند."
+        "message": msg
     }
 
 @router.post("/{job_id}/action")
