@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 from typing import Dict, List, Optional, Callable
-from sqlalchemy import select, update
+from sqlalchemy import select, update, delete
 from app.database.connection import AsyncSessionLocal
 from app.database.models import Account, CleaningJob, JobItem, SessionRecord, DialogSnapshot
 from app.core.crypto import decrypt_data
