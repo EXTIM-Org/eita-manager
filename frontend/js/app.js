@@ -689,6 +689,11 @@ function renderActiveJobs() {
 
   elements.activeJobsList.innerHTML = jobs.map(j => {
     const prog = getJobProgress(j);
+    const isPaused = j.state === 'PAUSED';
+    const statusTag = isPaused
+      ? '<span class="status-badge busy" style="background:rgba(234,179,8,0.2); color:#facc15; border:1px solid rgba(234,179,8,0.4); font-size:0.8rem;">⏸️ متوقف موقت</span>'
+      : '<span class="status-badge connected" style="background:rgba(34,197,94,0.15); color:#4ade80; border:1px solid rgba(34,197,94,0.3); font-size:0.8rem;">⚡ در حال اجرا</span>';
+
     return `
       <div class="job-card glass-card" id="card-${j.job_id}">
         <div class="job-card-header">
@@ -696,7 +701,7 @@ function renderActiveJobs() {
             <strong>تسک ${j.job_id}</strong>
             <span style="font-size:0.85rem; color:var(--text-muted); margin-right:8px;">حساب کاربری: ACC-${j.account_id}</span>
           </div>
-          <span class="tag-live">${j.state || 'در حال اجرا'}</span>
+          ${statusTag}
         </div>
         <div class="progress-bar-container">
           <div class="progress-bar-fill" style="width: ${prog.pct}%"></div>
@@ -704,12 +709,14 @@ function renderActiveJobs() {
         <div class="job-card-footer">
           <span style="font-size:0.85rem; color:var(--text-muted);">
             پیشرفت: ${toPersianDigits(prog.pct)}٪ (${toPersianDigits(prog.current)} از ${toPersianDigits(prog.total)})
-            ${j.current_peer_title ? ` • در حال خروج از: <strong>${j.current_peer_title}</strong>` : ''}
+            ${j.current_peer_title ? ` • در حال خروج از: <strong>${escapeHtml(j.current_peer_title)}</strong>` : ''}
           </span>
           <div class="job-controls">
-            <button class="btn btn-secondary btn-sm btn-job-pause" data-id="${j.job_id}">⏸️ توقف موقت</button>
-            <button class="btn btn-primary btn-sm btn-job-resume" data-id="${j.job_id}">▶️ ادامه</button>
-            <button class="btn btn-danger btn-sm btn-job-abort" data-id="${j.job_id}">⏹️ لغو</button>
+            ${isPaused 
+              ? `<button class="btn btn-primary btn-sm btn-job-resume" data-id="${j.job_id}">▶️ ادامه عملیات</button>`
+              : `<button class="btn btn-secondary btn-sm btn-job-pause" data-id="${j.job_id}">⏸️ توقف موقت</button>`
+            }
+            <button class="btn btn-danger btn-sm btn-job-abort" data-id="${j.job_id}">⏹️ لغو تسک</button>
           </div>
         </div>
       </div>
@@ -1757,24 +1764,60 @@ function setupEventListeners() {
 
   // Job Controls: Pause, Resume, Abort
   elements.activeJobsList.addEventListener('click', async (e) => {
-    const jid = e.target.getAttribute('data-id');
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const jid = btn.getAttribute('data-id');
     if (!jid) return;
 
-    if (e.target.classList.contains('btn-job-pause')) {
-      await fetch(`/api/v1/clean/${jid}/action`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'PAUSE' })
-      });
-      showToast('عملیات متوقف شد', 'info');
-    } else if (e.target.classList.contains('btn-job-resume')) {
-      await fetch(`/api/v1/clean/${jid}/action`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'RESUME' })
-      });
-      showToast('عملیات ادامه یافت', 'info');
-    } else if (e.target.classList.contains('btn-job-abort')) {
+    if (btn.classList.contains('btn-job-pause')) {
+      btn.disabled = true;
+      try {
+        const res = await fetch(`/api/v1/clean/${jid}/action`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'PAUSE' })
+        });
+        const json = await res.json();
+        if (json.success) {
+          if (state.activeJobs[jid]) {
+            state.activeJobs[jid].state = 'PAUSED';
+          }
+          renderActiveJobs();
+          updateDashboardActiveJobs();
+          showToast('عملیات به صورت موقت متوقف شد', 'info');
+        } else {
+          showToast(json.detail || json.message || 'خطا در توقف تسک', 'error');
+        }
+      } catch (err) {
+        showToast('خطا در برقراری ارتباط با سرور', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    } else if (btn.classList.contains('btn-job-resume')) {
+      btn.disabled = true;
+      try {
+        const res = await fetch(`/api/v1/clean/${jid}/action`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'RESUME' })
+        });
+        const json = await res.json();
+        if (json.success) {
+          if (state.activeJobs[jid]) {
+            state.activeJobs[jid].state = 'RUNNING';
+          }
+          renderActiveJobs();
+          updateDashboardActiveJobs();
+          showToast('عملیات با موفقیت ادامه یافت', 'success');
+        } else {
+          showToast(json.detail || json.message || 'خطا در ادامه تسک', 'error');
+        }
+      } catch (err) {
+        showToast('خطا در برقراری ارتباط با سرور', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    } else if (btn.classList.contains('btn-job-abort')) {
       const ok = await showConfirm({
         title: 'لغو عملیات پاکسازی',
         message: 'آیا از لغو کامل و توقف این عملیات پاکسازی اطمینان دارید؟',
@@ -1783,12 +1826,30 @@ function setupEventListeners() {
         icon: '⛔'
       });
       if (ok) {
-        await fetch(`/api/v1/clean/${jid}/action`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'ABORT' })
-        });
-        showToast('عملیات لغو شد', 'warning');
+        btn.disabled = true;
+        try {
+          const res = await fetch(`/api/v1/clean/${jid}/action`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'ABORT' })
+          });
+          const json = await res.json();
+          if (json.success) {
+            delete state.activeJobs[jid];
+            renderActiveJobs();
+            updateDashboardActiveJobs();
+            fetchAccounts();
+            fetchStats();
+            fetchReports();
+            showToast('عملیات پاکسازی با موفقیت لغو شد', 'warning');
+          } else {
+            showToast(json.detail || json.message || 'خطا در لغو تسک', 'error');
+          }
+        } catch (err) {
+          showToast('خطا در ارسال دستور لغو', 'error');
+        } finally {
+          btn.disabled = false;
+        }
       }
     }
   });

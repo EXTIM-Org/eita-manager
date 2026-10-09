@@ -168,21 +168,32 @@ class CleaningEngine:
         return False
 
     async def abort_job(self, job_id: str) -> bool:
-        if job_id in self.active_tasks:
-            task = self.active_tasks[job_id]
+        task = self.active_tasks.get(job_id)
+        if task:
             task.abort_requested = True
             task.state = "ABORTED"
             task.pause_event.set()
-            async with AsyncSessionLocal() as session:
+            account_id = task.account_id
+        else:
+            account_id = None
+
+        async with AsyncSessionLocal() as session:
+            job_res = await session.execute(select(CleaningJob).where(CleaningJob.id == job_id))
+            job = job_res.scalar_one_or_none()
+            if job:
+                job.status = "ABORTED"
+                job.finished_at = utc_now()
+                acc_id = account_id or job.account_id
                 await session.execute(
-                    update(CleaningJob).where(CleaningJob.id == job_id).values(
-                        status="ABORTED", finished_at=utc_now()
-                    )
-                )
-                await session.execute(
-                    update(Account).where(Account.id == task.account_id).values(status="CONNECTED")
+                    update(Account).where(Account.id == acc_id).values(status="CONNECTED")
                 )
                 await session.commit()
+                self.active_tasks.pop(job_id, None)
+                await self.broadcast("JOB_ABORTED", {"job_id": job_id, "account_id": acc_id})
+                return True
+
+        if task:
+            self.active_tasks.pop(job_id, None)
             await self.broadcast("JOB_ABORTED", {"job_id": job_id, "account_id": task.account_id})
             return True
         return False
