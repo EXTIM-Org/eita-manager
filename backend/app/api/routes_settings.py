@@ -7,7 +7,7 @@ from app.engine.cleaner import cleaner_engine
 router = APIRouter(prefix="/api/v1/settings", tags=["Settings"])
 
 class SettingsUpdateRequest(BaseModel):
-    max_concurrency: int = Field(default=5, ge=1, le=50, description="تعداد اکانت‌های همزمان")
+    max_concurrency: int = Field(default=5, ge=1, le=100, description="تعداد اکانت‌های همزمان")
     min_delay: float = Field(default=1.0, ge=0.5, le=30.0, description="حداقل تاخیر بین هر خروج به ثانیه")
     max_delay: float = Field(default=2.5, ge=1.0, le=60.0, description="حداکثر تاخیر بین هر خروج به ثانیه")
     flood_wait_action: str = Field(default="AUTO_WAIT", description="اقدام در مواجهه با FLOOD_WAIT (AUTO_WAIT, PAUSE, ABORT)")
