@@ -161,17 +161,21 @@ class EitaaClient:
             }
         }
 
-    async def get_dialogs(self, limit: Optional[int] = None, max_pages: int = 500) -> Dict[str, Any]:
+    async def get_dialogs(self, limit: Optional[int] = None, max_pages: Optional[int] = None) -> Dict[str, Any]:
         """
         Fetches dialogs (channels and groups) for this session from Eitaa.
-        Automatically handles MTProto pagination across all slices until the end.
+        Automatically handles MTProto pagination across all slices with NO limits.
         """
         all_chats: Dict[str, Dict[str, Any]] = {}
         offset_date = 0
         offset_id = 0
         offset_peer = tl_uint(0x7f3b18ea) # inputPeerEmpty (0x7f3b18ea)
 
-        for _ in range(max_pages):
+        page = 0
+        while True:
+            page += 1
+            if max_pages and page > max_pages:
+                break
             query = (
                 tl_uint(0xa0f4cb4f) # messages.getDialogs
                 + tl_int(0)         # flags
