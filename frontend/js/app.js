@@ -123,11 +123,6 @@ const elements = {
   inputMaxConcurrency: document.getElementById('inputMaxConcurrency'),
   inputMaxConcurrencyVal: document.getElementById('inputMaxConcurrencyVal'),
   displayMaxConcurrencyBadge: document.getElementById('displayMaxConcurrencyBadge'),
-  displayDelayBadge: document.getElementById('displayDelayBadge'),
-  inputMinDelay: document.getElementById('inputMinDelay'),
-  inputMaxDelay: document.getElementById('inputMaxDelay'),
-  selectFloodAction: document.getElementById('selectFloodAction'),
-  inputMaxFloodWait: document.getElementById('inputMaxFloodWait'),
   checkProtectCreator: document.getElementById('checkProtectCreator'),
   checkAutoDeleteHistory: document.getElementById('checkAutoDeleteHistory'),
   btnSaveSettings: document.getElementById('btnSaveSettings'),
@@ -499,40 +494,17 @@ function applySettingsToUI(cfg) {
     }
   }
 
-  if (elements.inputMinDelay) elements.inputMinDelay.value = cfg.min_delay !== undefined ? cfg.min_delay : 1.0;
-  if (elements.inputMaxDelay) elements.inputMaxDelay.value = cfg.max_delay !== undefined ? cfg.max_delay : 2.5;
-  if (elements.displayDelayBadge) {
-    const minD = cfg.min_delay !== undefined ? cfg.min_delay : 1.0;
-    const maxD = cfg.max_delay !== undefined ? cfg.max_delay : 2.5;
-    elements.displayDelayBadge.innerText = `${toPersianDigits(minD)} تا ${toPersianDigits(maxD)} ثانیه`;
-  }
-
-  if (elements.selectFloodAction) elements.selectFloodAction.value = cfg.flood_wait_action || 'AUTO_WAIT';
-  if (elements.inputMaxFloodWait) elements.inputMaxFloodWait.value = cfg.max_flood_wait_seconds || 120;
   if (elements.checkProtectCreator) elements.checkProtectCreator.checked = cfg.protect_creator_dialogs !== false;
   if (elements.checkAutoDeleteHistory) elements.checkAutoDeleteHistory.checked = cfg.auto_delete_history !== false;
 }
 
 async function saveSettings() {
-  const minDelay = parseFloat(elements.inputMinDelay.value);
-  const maxDelay = parseFloat(elements.inputMaxDelay.value);
-
-  if (isNaN(minDelay) || isNaN(maxDelay) || minDelay < 0.5 || maxDelay < 0.5) {
-    showToast('لطفاً مقادیر معتبر برای تاخیر وارد نمایید (حداقل ۰.۵ ثانیه)', 'error');
-    return;
-  }
-
-  if (minDelay > maxDelay) {
-    showToast('حداقل تاخیر نمی‌تواند بیشتر از حداکثر تاخیر باشد!', 'error');
-    return;
-  }
-
   const payload = {
-    max_concurrency: parseInt(elements.inputMaxConcurrency.value) || 5,
-    min_delay: minDelay,
-    max_delay: maxDelay,
-    flood_wait_action: elements.selectFloodAction.value || 'AUTO_WAIT',
-    max_flood_wait_seconds: parseInt(elements.inputMaxFloodWait.value) || 120,
+    max_concurrency: parseInt(elements.inputMaxConcurrency?.value) || 5,
+    min_delay: 1.0,
+    max_delay: 2.5,
+    flood_wait_action: 'AUTO_WAIT',
+    max_flood_wait_seconds: 120,
     protect_creator_dialogs: elements.checkProtectCreator ? elements.checkProtectCreator.checked : true,
     auto_delete_history: elements.checkAutoDeleteHistory ? elements.checkAutoDeleteHistory.checked : true
   };
@@ -1316,7 +1288,7 @@ function setupEventListeners() {
         'accounts': ['مدیریت و پایش حساب‌ها', 'فهرست، فیلتر، جستجو و عملیات دسته‌ای روی حساب‌های ایتا'],
         'cleaner': ['عملیات پاکسازی زنده', 'مانیتورینگ و کنترل بی‌درنگ خروج از کانال‌ها و گروه‌ها'],
         'reports': ['گزارشات و تاریخچه ممیزی', 'مشاهده لاگ‌های جزئی و سوابق پاکسازی موفق و ناموفق'],
-        'settings': ['تنظیمات و پیکربندی سیستم', 'مدیریت سقف همزمانی ورکرها، تاخیر هوشمند و قوانین ایمنی پاکسازی']
+        'settings': ['تنظیمات و پیکربندی سیستم', 'مدیریت سقف همزمانی ورکرها و قوانین ایمنی پاکسازی']
       };
       if (titleMap[tabName]) {
         elements.pageTitle.innerText = titleMap[tabName][0];
@@ -1951,16 +1923,6 @@ function setupEventListeners() {
     });
   }
 
-  const updateDelayBadge = () => {
-    const minD = elements.inputMinDelay ? elements.inputMinDelay.value : '2';
-    const maxD = elements.inputMaxDelay ? elements.inputMaxDelay.value : '4.5';
-    if (elements.displayDelayBadge) {
-      elements.displayDelayBadge.innerText = `${toPersianDigits(minD)} تا ${toPersianDigits(maxD)} ثانیه`;
-    }
-  };
-
-  if (elements.inputMinDelay) elements.inputMinDelay.addEventListener('input', updateDelayBadge);
-  if (elements.inputMaxDelay) elements.inputMaxDelay.addEventListener('input', updateDelayBadge);
 
   if (elements.btnSaveSettings) {
     elements.btnSaveSettings.addEventListener('click', saveSettings);

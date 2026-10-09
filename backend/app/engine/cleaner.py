@@ -35,11 +35,11 @@ class CleaningEngine:
         self.active_tasks: Dict[str, CleaningTask] = {}
         self.task_queue: asyncio.Queue = asyncio.Queue()
         cfg = load_settings()
-        self.max_concurrency = int(cfg.get("max_concurrency", 5))
-        self.min_delay = float(cfg.get("min_delay", 1.0))
-        self.max_delay = float(cfg.get("max_delay", 2.5))
-        self.flood_wait_action = cfg.get("flood_wait_action", "AUTO_WAIT")
-        self.max_flood_wait_seconds = int(cfg.get("max_flood_wait_seconds", 120))
+        # Standard balanced anti-flood settings (hardcoded)
+        self.min_delay = 1.0
+        self.max_delay = 2.5
+        self.flood_wait_action = "AUTO_WAIT"
+        self.max_flood_wait_seconds = 120
         self.protect_creator_dialogs = bool(cfg.get("protect_creator_dialogs", True))
         self.auto_delete_history = bool(cfg.get("auto_delete_history", True))
         self.workers: List[asyncio.Task] = []
@@ -47,10 +47,11 @@ class CleaningEngine:
         self.is_running = False
 
     def apply_settings(self, cfg: dict):
-        self.min_delay = float(cfg.get("min_delay", self.min_delay))
-        self.max_delay = float(cfg.get("max_delay", self.max_delay))
-        self.flood_wait_action = cfg.get("flood_wait_action", self.flood_wait_action)
-        self.max_flood_wait_seconds = int(cfg.get("max_flood_wait_seconds", self.max_flood_wait_seconds))
+        # Standard balanced mode is permanently hardcoded
+        self.min_delay = 1.0
+        self.max_delay = 2.5
+        self.flood_wait_action = "AUTO_WAIT"
+        self.max_flood_wait_seconds = 120
         self.protect_creator_dialogs = bool(cfg.get("protect_creator_dialogs", self.protect_creator_dialogs))
         self.auto_delete_history = bool(cfg.get("auto_delete_history", self.auto_delete_history))
 
@@ -350,9 +351,8 @@ class CleaningEngine:
             account_id=task.account_id
         )
 
-        # Safe concurrency for channel/group leaves per account to prevent MTProto flood drops
-        concurrency = min(max(1, self.max_concurrency), 4)
-        sem = asyncio.Semaphore(concurrency)
+        # Safe concurrency for channel/group leaves per account (Balanced Mode: exactly 2 concurrent operations)
+        sem = asyncio.Semaphore(2)
         processed_count = 0
         lock = asyncio.Lock()
 
@@ -487,8 +487,8 @@ class CleaningEngine:
                         "fail_count": task.fail_count
                     })
 
-                # Adaptive Jitter Delay based on system settings
-                delay = random.uniform(min(self.min_delay, self.max_delay), max(self.min_delay, self.max_delay))
+                # Balanced & Standard mode delay: 1.0s to 2.5s jitter per leave
+                delay = random.uniform(1.0, 2.5)
                 await asyncio.sleep(delay)
 
         try:

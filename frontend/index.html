@@ -336,47 +336,7 @@
               </div>
             </div>
 
-            <!-- Card 2: Rate Limit & Anti-Flood Settings -->
-            <div class="card glass-card">
-              <div class="card-header">
-                <div>
-                  <h3>🛡️ کنترل تاخیر و ضد اسپم (Rate Limiting & Anti-Flood)</h3>
-                  <p class="card-subtitle">تنظیم فاصله زمانی هوشمند بین درخواست‌های خروج جهت جلوگیری از لیمیت یا مسدود شدن حساب‌ها</p>
-                </div>
-                <span class="badge green" id="displayDelayBadge">۱.۰ تا ۲.۵ ثانیه</span>
-              </div>
-              <div class="card-body">
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
-                  <div class="form-group">
-                    <label for="inputMinDelay">حداقل تاخیر بین خروج‌ها (ثانیه):</label>
-                    <input type="number" class="form-control" id="inputMinDelay" min="0.5" max="30" step="0.5" value="1.0">
-                    <span style="font-size:0.75rem; color:var(--text-muted);">پیش‌فرض: ۱.۰ ثانیه</span>
-                  </div>
-                  <div class="form-group">
-                    <label for="inputMaxDelay">حداکثر تاخیر بین خروج‌ها (ثانیه):</label>
-                    <input type="number" class="form-control" id="inputMaxDelay" min="1.0" max="60" step="0.5" value="2.5">
-                    <span style="font-size:0.75rem; color:var(--text-muted);">پیش‌فرض: ۲.۵ ثانیه</span>
-                  </div>
-                </div>
-
-                <div class="form-group" style="margin-top:10px;">
-                  <label for="selectFloodAction">رفتار در مواجهه با خطای FLOOD_WAIT (محدودیت موقت سرور ایتا):</label>
-                  <select class="form-control" id="selectFloodAction">
-                    <option value="AUTO_WAIT">انتظار هوشمند تا پایان زمان لیمیت و ادامه خودکار (توصیه‌شده)</option>
-                    <option value="PAUSE">توقف موقت تسک (نیاز به زدن دکمه ادامه توسط کاربر)</option>
-                    <option value="ABORT">لغو و توقف کامل تسک این اکانت</option>
-                  </select>
-                </div>
-
-                <div class="form-group">
-                  <label for="inputMaxFloodWait">سقف مجاز زمان انتظار برای FLOOD_WAIT (ثانیه):</label>
-                  <input type="number" class="form-control" id="inputMaxFloodWait" min="10" max="3600" step="10" value="120">
-                  <span style="font-size:0.75rem; color:var(--text-muted);">اگر سرور زمان انتظاری طولانی‌تر از این مقدار اعلام کند، واکنش بالا به صورت خودکار اعمال می‌شود.</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Card 3: Safety & Cleaning Rules -->
+            <!-- Card 2: Safety & Cleaning Rules -->
             <div class="card glass-card">
               <div class="card-header">
                 <div>
