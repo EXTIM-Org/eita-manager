@@ -1145,6 +1145,9 @@ function setupEventListeners() {
     elements.authStep2.style.display = 'none';
     elements.inputPhone.value = '';
     elements.inputOtp.value = '';
+    setTimeout(() => {
+      elements.inputPhone.focus();
+    }, 60);
   });
 
   elements.btnCloseAddModal.addEventListener('click', () => {
@@ -1156,6 +1159,17 @@ function setupEventListeners() {
     elements.authStep1.style.display = 'block';
     elements.authStep2.style.display = 'none';
     clearInterval(state.otpCountdownInterval);
+    setTimeout(() => {
+      elements.inputPhone.focus();
+    }, 60);
+  });
+
+  // Enter key support for phone input
+  elements.inputPhone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      elements.btnSendCode.click();
+    }
   });
 
   // Send Code
@@ -1164,6 +1178,7 @@ function setupEventListeners() {
     const label = elements.inputLabel.value.trim();
     if (!phone) {
       showToast('لطفاً شماره موبایل را وارد نمایید', 'error');
+      elements.inputPhone.focus();
       return;
     }
 
@@ -1184,6 +1199,9 @@ function setupEventListeners() {
         elements.authStep2.style.display = 'block';
         startOtpTimer(json.data.timeout_seconds || 120);
         showToast('کد تأیید از طریق پیام‌رسان ایتا ارسال شد', 'success');
+        setTimeout(() => {
+          elements.inputOtp.focus();
+        }, 60);
       } else {
         showToast(json.detail || 'خطا در ارسال کد', 'error');
       }
@@ -1192,6 +1210,14 @@ function setupEventListeners() {
     } finally {
       elements.btnSendCode.disabled = false;
       elements.btnSendCode.innerText = 'ارسال کد تأیید';
+    }
+  });
+
+  // Enter key support for OTP input
+  elements.inputOtp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      elements.btnVerifyCode.click();
     }
   });
 
