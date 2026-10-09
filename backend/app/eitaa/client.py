@@ -242,6 +242,12 @@ class EitaaClient:
                 "error_code": result.get("error_code"),
                 "error_message": result.get("error_message")
             }
+        if result.get("type") != "rpc_result":
+            return {
+                "success": False,
+                "error_code": result.get("code", 500),
+                "error_message": result.get("message", "Eitaa request failed")
+            }
         return {"success": True}
 
     async def delete_channel_history(self, channel_id: int, access_hash: int, is_channel: bool = True) -> Dict[str, Any]:
@@ -257,6 +263,12 @@ class EitaaClient:
                 "error_code": result.get("error_code"),
                 "error_message": result.get("error_message")
             }
+        if result.get("type") != "rpc_result":
+            return {
+                "success": False,
+                "error_code": result.get("code", 500),
+                "error_message": result.get("message", "Eitaa request failed")
+            }
         return {"success": True}
 
     async def delete_chat_user(self, chat_id: int) -> Dict[str, Any]:
@@ -270,6 +282,12 @@ class EitaaClient:
                 "success": False,
                 "error_code": result.get("error_code"),
                 "error_message": result.get("error_message")
+            }
+        if result.get("type") != "rpc_result":
+            return {
+                "success": False,
+                "error_code": result.get("code", 500),
+                "error_message": result.get("message", "Eitaa request failed")
             }
         return {"success": True}
 

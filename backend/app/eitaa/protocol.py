@@ -1,4 +1,5 @@
 import struct
+import gzip
 from typing import Any, Dict, List, Tuple
 
 # Eitaa Protocol Constants
@@ -8,6 +9,7 @@ AUTH_SEND_CODE_ID = 0xa677244f
 AUTH_SIGN_IN_ID = 0xbcd51581
 RPC_ERROR_ID = 0x2144ca19
 RPC_RESULT_ID = 0xf35c6d01
+GZIP_PACKED_ID = 0x3072c41e
 VECTOR_ID = 0x1cb5c415
 
 INPUT_CHANNEL_ID = 0xf35aec28
@@ -178,6 +180,7 @@ class TLReader:
 def parse_eitaa_response(data: bytes) -> Dict[str, Any]:
     """
     Parses an incoming TL response from Eitaa server.
+    Properly handles RPC_RESULT, GZIP_PACKED payloads, and inner RPC errors.
     """
     if len(data) < 4:
         return {"type": "error", "message": "Response too short", "code": 500}
@@ -185,19 +188,58 @@ def parse_eitaa_response(data: bytes) -> Dict[str, Any]:
     reader = TLReader(data)
     cid = reader.read_uint()
 
+    # Top-level gzip_packed
+    if cid == GZIP_PACKED_ID:
+        try:
+            packed_data = reader.read_bytes()
+            decompressed = gzip.decompress(packed_data)
+            return parse_eitaa_response(decompressed)
+        except Exception as e:
+            return {"type": "error", "message": f"Gzip decompress error: {e}", "code": 500}
+
     # RPC Result wrapper
     if cid == RPC_RESULT_ID:
         if reader.remaining() >= 8:
             req_msg_id = reader.read_long()
             inner_cid = reader.read_uint()
+
+            # Check if inner content is directly an RPC error
             if inner_cid == RPC_ERROR_ID:
                 code = reader.read_int()
                 msg = reader.read_string()
                 return {
                     "type": "rpc_error",
                     "error_code": code,
-                    "error_message": msg
+                    "error_message": msg,
+                    "req_msg_id": req_msg_id
                 }
+
+            # Check if inner content is gzip_packed
+            if inner_cid == GZIP_PACKED_ID:
+                try:
+                    packed_data = reader.read_bytes()
+                    decompressed = gzip.decompress(packed_data)
+                    if len(decompressed) >= 4:
+                        decomp_reader = TLReader(decompressed)
+                        inner_decomp_cid = decomp_reader.read_uint()
+                        if inner_decomp_cid == RPC_ERROR_ID:
+                            code = decomp_reader.read_int()
+                            msg = decomp_reader.read_string()
+                            return {
+                                "type": "rpc_error",
+                                "error_code": code,
+                                "error_message": msg,
+                                "req_msg_id": req_msg_id
+                            }
+                        return {
+                            "type": "rpc_result",
+                            "req_msg_id": req_msg_id,
+                            "constructor_id": hex(inner_decomp_cid),
+                            "raw_bytes": decompressed
+                        }
+                except Exception as e:
+                    return {"type": "error", "message": f"Inner gzip decompress error: {e}", "code": 500}
+
             # Otherwise it is a successful RPC result, return raw data including inner result
             return {
                 "type": "rpc_result",

@@ -334,7 +334,8 @@ class CleaningEngine:
             account_id=task.account_id
         )
 
-        concurrency = max(1, self.max_concurrency)
+        # Safe concurrency for channel/group leaves per account to prevent MTProto flood drops
+        concurrency = min(max(1, self.max_concurrency), 4)
         sem = asyncio.Semaphore(concurrency)
         processed_count = 0
         lock = asyncio.Lock()
@@ -361,14 +362,37 @@ class CleaningEngine:
                 error_msg = None
                 error_code = None
 
-                if target.peer_type in ["channel", "supergroup"]:
-                    res = await client.leave_channel(channel_id=peer_id_int, access_hash=target.access_hash)
-                    if res.get("success") and self.auto_delete_history:
-                        await client.delete_channel_history(channel_id=peer_id_int, access_hash=target.access_hash)
-                else:
-                    res = await client.delete_chat_user(chat_id=peer_id_int)
-                    if res.get("success") and self.auto_delete_history:
-                        await client.delete_channel_history(channel_id=peer_id_int, access_hash=0, is_channel=False)
+                # Attempt leave with up to 1 retry on transient error / flood wait
+                max_attempts = 2
+                res = {"success": False}
+                for attempt in range(max_attempts):
+                    if task.abort_requested:
+                        break
+
+                    if target.peer_type in ["channel", "supergroup"]:
+                        res = await client.leave_channel(channel_id=peer_id_int, access_hash=target.access_hash)
+                        if res.get("success") and self.auto_delete_history:
+                            await client.delete_channel_history(channel_id=peer_id_int, access_hash=target.access_hash)
+                    else:
+                        res = await client.delete_chat_user(chat_id=peer_id_int)
+                        if res.get("success") and self.auto_delete_history:
+                            await client.delete_channel_history(channel_id=peer_id_int, access_hash=0, is_channel=False)
+
+                    if res.get("success"):
+                        break
+                    
+                    err_text = str(res.get("error_message", ""))
+                    if "FLOOD_WAIT" in err_text.upper():
+                        wait_seconds = 15
+                        parts = err_text.split("_")
+                        if len(parts) >= 3 and parts[-1].isdigit():
+                            wait_seconds = int(parts[-1])
+                        if wait_seconds <= 30 and attempt == 0:
+                            await asyncio.sleep(wait_seconds + 1)
+                            continue
+                    elif attempt == 0:
+                        await asyncio.sleep(1.5)
+                        continue
 
                 async with lock:
                     if res.get("success"):
@@ -380,9 +404,9 @@ class CleaningEngine:
                         error_msg = err_text
 
                         # Handle FLOOD_WAIT
-                        if "FLOOD_WAIT" in err_text.upper():
+                        if "FLOOD_WAIT" in str(err_text).upper():
                             wait_seconds = 30
-                            parts = err_text.split("_")
+                            parts = str(err_text).split("_")
                             if len(parts) >= 3 and parts[-1].isdigit():
                                 wait_seconds = int(parts[-1])
                             
@@ -418,7 +442,12 @@ class CleaningEngine:
                         )
                         session.add(item)
                         if leave_success:
-                            await session.delete(target)
+                            await session.execute(
+                                delete(DialogSnapshot).where(
+                                    DialogSnapshot.account_id == task.account_id,
+                                    DialogSnapshot.peer_id == target.peer_id
+                                )
+                            )
                         await session.execute(
                             update(CleaningJob).where(CleaningJob.id == task.job_id).values(
                                 success_count=task.success_count,
@@ -460,8 +489,18 @@ class CleaningEngine:
                         finished_at=utc_now()
                     )
                 )
+                # Recalculate remaining channels count in DB for this account
+                rem_res = await session.execute(
+                    select(DialogSnapshot).where(DialogSnapshot.account_id == task.account_id)
+                )
+                all_rem = rem_res.scalars().all()
+                ch_rem = sum(1 for x in all_rem if x.peer_type in ["channel", "supergroup"])
+                gr_rem = sum(1 for x in all_rem if x.peer_type == "basic_group")
+
                 await session.execute(
                     update(Account).where(Account.id == task.account_id).values(
+                        total_channels_cached=ch_rem,
+                        total_groups_cached=gr_rem,
                         status="CONNECTED",
                         last_cleaned_at=utc_now()
                     )

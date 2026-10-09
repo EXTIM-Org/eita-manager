@@ -130,6 +130,29 @@ async def get_account_detail(account_id: int, db: AsyncSession = Depends(get_db)
         }
     }
 
+class UpdateAccountRequest(BaseModel):
+    label: str
+
+@router.patch("/{account_id}")
+async def update_account(account_id: int, req: UpdateAccountRequest, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Account).where(Account.id == account_id))
+    account = result.scalar_one_or_none()
+    if not account:
+        raise HTTPException(status_code=404, detail="حساب کاربری یافت نشد.")
+
+    account.label = req.label.strip()
+    await db.commit()
+    await db.refresh(account)
+
+    return {
+        "success": True,
+        "message": "نام حساب کاربری با موفقیت ویرایش شد.",
+        "data": {
+            "id": account.id,
+            "label": account.label
+        }
+    }
+
 @router.delete("/{account_id}")
 async def delete_account(account_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Account).where(Account.id == account_id))

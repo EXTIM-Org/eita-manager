@@ -156,7 +156,7 @@
           <div class="toolbar-left">
             <div class="search-box">
               <span class="search-icon">🔍</span>
-              <input type="text" id="accountSearchInput" placeholder="جستجو بر اساس شناسه، شماره یا برچسب...">
+              <input type="text" id="accountSearchInput" placeholder="جستجو بر اساس شناسه، شماره یا نام حساب...">
             </div>
             <div class="filter-pills">
               <button class="filter-pill active" data-filter="all">همه</button>
@@ -186,7 +186,7 @@
               <tr>
                 <th width="40"><input type="checkbox" id="selectAllCheckbox"></th>
                 <th>شناسه داخلی</th>
-                <th>نام و برچسب</th>
+                <th>نام حساب کاربری</th>
                 <th>شماره موبایل</th>
                 <th>وضعیت نشست</th>
                 <th>تعداد عضویت‌ها</th>
@@ -424,10 +424,10 @@
 
   <!-- Modal: Add Account (Multi-step Auth) -->
   <div class="modal-backdrop" id="modalAddAccount" style="display:none;">
-    <div class="modal glass-card">
+    <div class="modal glass-card" id="modalAddAccountContent">
       <div class="modal-header">
         <h3 id="modalAuthTitle">🔐 افزودن حساب جدید ایتا</h3>
-        <button class="modal-close" id="btnCloseAddModal">×</button>
+        <button type="button" class="modal-close" id="btnCloseAddModal">×</button>
       </div>
 
       <div class="modal-body">
@@ -439,10 +439,10 @@
             <input type="tel" id="inputPhone" placeholder="09123456789 یا +989123456789" class="form-control" dir="ltr">
           </div>
           <div class="form-group">
-            <label>برچسب / نام داخلی (اختیاری):</label>
-            <input type="text" id="inputLabel" placeholder="مثلاً: اکانت پشتیبانی ۱" class="form-control">
+            <label>نام حساب کاربری (اختیاری):</label>
+            <input type="text" id="inputLabel" placeholder="مثلاً: حساب شخصی، پشتیبانی ۱" class="form-control">
           </div>
-          <button class="btn btn-primary btn-block" id="btnSendCode">
+          <button type="button" class="btn btn-primary btn-block" id="btnSendCode">
             <span>ارسال کد تأیید</span>
           </button>
         </div>
@@ -458,10 +458,10 @@
             <span>مدت زمان اعتبار: </span>
             <strong id="otpCountdown">02:00</strong>
           </div>
-          <button class="btn btn-success btn-block" id="btnVerifyCode">
+          <button type="button" class="btn btn-success btn-block" id="btnVerifyCode">
             <span>تأیید و اتصال امن نشست</span>
           </button>
-          <button class="btn-text btn-block mt-2" id="btnBackToStep1">تغییر شماره موبایل</button>
+          <button type="button" class="btn-text btn-block mt-2" id="btnBackToStep1">تغییر شماره موبایل</button>
         </div>
       </div>
     </div>

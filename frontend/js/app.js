@@ -141,6 +141,16 @@ function toPersianDigits(n) {
   return String(n).replace(/[0-9]/g, w => f[+w]);
 }
 
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function showToast(message, type = 'info') {
   const container = document.getElementById('toastContainer');
   const toast = document.createElement('div');
@@ -659,7 +669,12 @@ function renderAccountsTable() {
           <input type="checkbox" class="acc-checkbox" data-id="${acc.id}" ${isSelected ? 'checked' : ''}>
         </td>
         <td><strong>${acc.internal_id}</strong></td>
-        <td>${acc.label || acc.first_name || 'بدون نام'}</td>
+        <td>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <strong style="color:var(--text-main); font-size:0.95rem;">${escapeHtml(acc.label || acc.first_name || 'بدون نام')}</strong>
+            <button class="btn-text btn-rename-acc" data-id="${acc.id}" data-name="${escapeHtml(acc.label || '')}" title="ویرایش نام حساب" style="padding:2px 6px; font-size:0.85rem; cursor:pointer;">✏️</button>
+          </div>
+        </td>
         <td dir="ltr" style="text-align:right;">${acc.phone_masked}</td>
         <td><span class="status-badge ${st.class}">${st.text}</span></td>
         <td>${toPersianDigits(acc.total_channels)} کانال / ${toPersianDigits(acc.total_groups)} گروه</td>
@@ -1334,12 +1349,16 @@ function setupEventListeners() {
   // Modal: Add Account
   elements.btnOpenAddModal.addEventListener('click', () => {
     elements.modalAddAccount.style.display = 'flex';
-    elements.authStep1.style.display = 'block';
-    elements.authStep2.style.display = 'none';
-    elements.inputPhone.value = '';
-    elements.inputOtp.value = '';
+    if (elements.authStep2.style.display !== 'block') {
+      elements.authStep1.style.display = 'block';
+      elements.authStep2.style.display = 'none';
+    }
     setTimeout(() => {
-      elements.inputPhone.focus();
+      if (elements.authStep2.style.display === 'block') {
+        elements.inputOtp.focus();
+      } else {
+        elements.inputPhone.focus();
+      }
     }, 60);
   });
 
@@ -1348,7 +1367,11 @@ function setupEventListeners() {
     clearInterval(state.otpCountdownInterval);
   });
 
-  elements.btnBackToStep1.addEventListener('click', () => {
+  elements.btnBackToStep1.addEventListener('click', (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     elements.authStep1.style.display = 'block';
     elements.authStep2.style.display = 'none';
     clearInterval(state.otpCountdownInterval);
@@ -1366,7 +1389,11 @@ function setupEventListeners() {
   });
 
   // Send Code
-  elements.btnSendCode.addEventListener('click', async () => {
+  elements.btnSendCode.addEventListener('click', async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     const phone = elements.inputPhone.value.trim();
     const label = elements.inputLabel.value.trim();
     if (!phone) {
@@ -1394,7 +1421,7 @@ function setupEventListeners() {
         showToast('کد تأیید از طریق پیام‌رسان ایتا ارسال شد', 'success');
         setTimeout(() => {
           elements.inputOtp.focus();
-        }, 60);
+        }, 80);
       } else {
         showToast(json.detail || 'خطا در ارسال کد', 'error');
       }
@@ -1415,7 +1442,11 @@ function setupEventListeners() {
   });
 
   // Verify Code
-  elements.btnVerifyCode.addEventListener('click', async () => {
+  elements.btnVerifyCode.addEventListener('click', async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     const otp = elements.inputOtp.value.trim();
     if (!otp) {
       showToast('لطفاً کد تأیید ورود را وارد نمایید', 'error');
@@ -1441,6 +1472,12 @@ function setupEventListeners() {
       if (json.success) {
         showToast('حساب کاربری با موفقیت متصل و سشن ذخیره شد', 'success');
         elements.modalAddAccount.style.display = 'none';
+        elements.inputPhone.value = '';
+        elements.inputLabel.value = '';
+        elements.inputOtp.value = '';
+        elements.authStep1.style.display = 'block';
+        elements.authStep2.style.display = 'none';
+        clearInterval(state.otpCountdownInterval);
         fetchAccounts();
         fetchStats();
       } else {
@@ -1631,10 +1668,50 @@ function setupEventListeners() {
     }
   });
 
+  const modalAddAccountContent = document.getElementById('modalAddAccountContent');
+  if (modalAddAccountContent) {
+    modalAddAccountContent.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+  }
+
   elements.modalAddAccount.addEventListener('click', (e) => {
     if (e.target === elements.modalAddAccount) {
+      if (elements.btnSendCode.disabled || elements.btnVerifyCode.disabled) {
+        return; // Do not close while network operation is in progress
+      }
       elements.modalAddAccount.style.display = 'none';
       clearInterval(state.otpCountdownInterval);
+    }
+  });
+
+  // Account Rename Button Handler
+  document.addEventListener('click', async (e) => {
+    const renameBtn = e.target.closest('.btn-rename-acc');
+    if (renameBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const accId = renameBtn.getAttribute('data-id');
+      const currentName = renameBtn.getAttribute('data-name') || '';
+      const newName = prompt('نام دلخواه جدید حساب کاربری را وارد نمایید:', currentName);
+      if (newName !== null && newName.trim() !== '' && newName.trim() !== currentName) {
+        try {
+          const res = await fetch(`/api/v1/accounts/${accId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ label: newName.trim() })
+          });
+          const json = await res.json();
+          if (json.success) {
+            showToast('نام حساب کاربری با موفقیت بروزرسانی شد', 'success');
+            fetchAccounts();
+          } else {
+            showToast(json.detail || 'خطا در ویرایش نام', 'error');
+          }
+        } catch (err) {
+          showToast('خطا در برقراری ارتباط با سرور', 'error');
+        }
+      }
     }
   });
 
