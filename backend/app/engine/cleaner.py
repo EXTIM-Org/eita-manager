@@ -190,53 +190,57 @@ class CleaningEngine:
                 await asyncio.sleep(2.0)
 
     async def _process_task(self, task: CleaningTask):
-        client = None
         try:
-            task.state = "RUNNING"
-            async with AsyncSessionLocal() as session:
-                # Load account and decrypt session
-                acc_result = await session.execute(
-                    select(Account).where(Account.id == task.account_id)
-                )
-                account = acc_result.scalar_one_or_none()
-                if not account:
-                    task.state = "FAILED"
-                    await self.broadcast("JOB_COMPLETED", {
-                        "job_id": task.job_id,
-                        "account_id": task.account_id,
-                        "total_targets": 0,
-                        "success_count": 0,
-                        "fail_count": 0,
-                        "status": "FAILED"
-                    })
-                    return
+            await self._run_cleaning(task)
+        finally:
+            self.active_tasks.pop(task.job_id, None)
 
-                sess_result = await session.execute(
-                    select(SessionRecord).where(SessionRecord.account_id == task.account_id)
+    async def _run_cleaning(self, task: CleaningTask):
+        task.state = "RUNNING"
+        async with AsyncSessionLocal() as session:
+            # Load account and decrypt session
+            acc_result = await session.execute(
+                select(Account).where(Account.id == task.account_id)
+            )
+            account = acc_result.scalar_one_or_none()
+            if not account:
+                task.state = "FAILED"
+                await self.broadcast("JOB_COMPLETED", {
+                    "job_id": task.job_id,
+                    "account_id": task.account_id,
+                    "total_targets": 0,
+                    "success_count": 0,
+                    "fail_count": 0,
+                    "status": "FAILED"
+                })
+                return
+
+            sess_result = await session.execute(
+                select(SessionRecord).where(SessionRecord.account_id == task.account_id)
+            )
+            session_rec = sess_result.scalar_one_or_none()
+            if not session_rec or not session_rec.is_valid:
+                task.state = "FAILED"
+                await session.execute(
+                    update(Account).where(Account.id == task.account_id).values(status="NEEDS_REAUTH")
                 )
-                session_rec = sess_result.scalar_one_or_none()
-                if not session_rec or not session_rec.is_valid:
-                    task.state = "FAILED"
-                    await session.execute(
-                        update(Account).where(Account.id == task.account_id).values(status="NEEDS_REAUTH")
+                await session.execute(
+                    update(CleaningJob).where(CleaningJob.id == task.job_id).values(
+                        status="FAILED",
+                        failure_summary="نشست نامعتبر است یا منقضی شده است.",
+                        finished_at=utc_now()
                     )
-                    await session.execute(
-                        update(CleaningJob).where(CleaningJob.id == task.job_id).values(
-                            status="FAILED",
-                            failure_summary="نشست نامعتبر است یا منقضی شده است.",
-                            finished_at=utc_now()
-                        )
-                    )
-                    await session.commit()
-                    await self.broadcast("JOB_COMPLETED", {
-                        "job_id": task.job_id,
-                        "account_id": task.account_id,
-                        "total_targets": 0,
-                        "success_count": 0,
-                        "fail_count": 0,
-                        "status": "FAILED"
-                    })
-                    return
+                )
+                await session.commit()
+                await self.broadcast("JOB_COMPLETED", {
+                    "job_id": task.job_id,
+                    "account_id": task.account_id,
+                    "total_targets": 0,
+                    "success_count": 0,
+                    "fail_count": 0,
+                    "status": "FAILED"
+                })
+                return
 
             try:
                 decrypted_json = decrypt_data({
@@ -477,6 +481,5 @@ class CleaningEngine:
                     await client.close()
                 except Exception:
                     pass
-            self.active_tasks.pop(task.job_id, None)
 
 cleaner_engine = CleaningEngine()
