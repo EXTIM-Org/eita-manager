@@ -1,0 +1,9 @@
+{
+  "max_concurrency": 5,
+  "min_delay": 1.0,
+  "max_delay": 2.5,
+  "flood_wait_action": "AUTO_WAIT",
+  "max_flood_wait_seconds": 120,
+  "protect_creator_dialogs": true,
+  "auto_delete_history": true
+}

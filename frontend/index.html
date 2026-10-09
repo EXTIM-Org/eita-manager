@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>سامانه مدیریت و پاکسازی چند حساب ایتا | Eitaa Cleaner</title>
+  <meta name="description" content="سامانه جامع مدیریت، نگهداری سشن‌های امن و پاکسازی گروهی تا ۱۰۰+ حساب پیام‌رسان ایتا">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">⚡</div>
+        <div class="brand-text">
+          <h2>ایتا منیجر</h2>
+          <span>Eitaa Multi-Account</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-item active" data-tab="dashboard">
+          <span class="icon">📊</span>
+          <span>داشبورد آماری</span>
+        </button>
+        <button class="nav-item" data-tab="accounts">
+          <span class="icon">👥</span>
+          <span>مدیریت حساب‌ها</span>
+          <span class="badge" id="accCountBadge">0</span>
+        </button>
+        <button class="nav-item" data-tab="cleaner">
+          <span class="icon">🧹</span>
+          <span>عملیات پاکسازی زنده</span>
+          <span class="badge pulse-badge" id="activeJobsBadge" style="display:none;">0</span>
+        </button>
+        <button class="nav-item" data-tab="reports">
+          <span class="icon">📝</span>
+          <span>گزارشات و تاریخچه</span>
+        </button>
+        <button class="nav-item" data-tab="settings">
+          <span class="icon">⚙️</span>
+          <span>تنظیمات سیستم</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="connection-status" id="wsStatus">
+          <span class="status-dot"></span>
+          <span class="status-text">اتصال زنده برقرار است</span>
+        </div>
+        <div class="version-tag">نسخه ۱.۰.۰ • پروتکل رسمی ایتا</div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Top Header -->
+      <header class="top-header">
+        <div class="header-title">
+          <h1 id="pageTitle">داشبورد جامع مدیریت حساب‌ها</h1>
+          <p id="pageSubtitle">نمای آماری وضعیت اتصال و پاکسازی حساب‌های کاربری</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-secondary" id="btnRefresh">
+            <span class="btn-icon">🔄</span>
+            <span>بروزرسانی</span>
+          </button>
+          <button class="btn btn-primary" id="btnOpenAddModal">
+            <span class="btn-icon">➕</span>
+            <span>افزودن حساب جدید</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Tab: Dashboard -->
+      <section class="tab-pane active" id="tab-dashboard">
+        <!-- Stats Cards Grid -->
+        <div class="stats-grid">
+          <div class="stat-card glass-card">
+            <div class="stat-icon-wrapper blue">👥</div>
+            <div class="stat-info">
+              <span class="stat-label">تعداد کل حساب‌ها</span>
+              <h3 class="stat-value" id="statTotalAccounts">۰</h3>
+            </div>
+            <div class="stat-trend">ظرفیت تا ۱۰۰+ حساب</div>
+          </div>
+
+          <div class="stat-card glass-card">
+            <div class="stat-icon-wrapper green">🟢</div>
+            <div class="stat-info">
+              <span class="stat-label">حساب‌های فعال و متصل</span>
+              <h3 class="stat-value" id="statActiveAccounts">۰</h3>
+            </div>
+            <div class="stat-trend success" id="statActivePct">۱۰۰٪ آماده به کار</div>
+          </div>
+
+          <div class="stat-card glass-card">
+            <div class="stat-icon-wrapper yellow">⚠️</div>
+            <div class="stat-info">
+              <span class="stat-label">نیازمند ورود مجدد</span>
+              <h3 class="stat-value" id="statNeedsReauth">۰</h3>
+            </div>
+            <div class="stat-trend warning">سشن‌های نامعتبر</div>
+          </div>
+
+          <div class="stat-card glass-card">
+            <div class="stat-icon-wrapper purple">🧹</div>
+            <div class="stat-info">
+              <span class="stat-label">کانال‌ها و گروه‌های پاک‌شده</span>
+              <h3 class="stat-value" id="statTotalCleaned">۰</h3>
+            </div>
+            <div class="stat-trend">ترک موفق اعتبارات</div>
+          </div>
+        </div>
+
+        <!-- Dashboard Two-Column Layout -->
+        <div class="dashboard-columns">
+          <!-- Active Jobs Card -->
+          <div class="card glass-card">
+            <div class="card-header">
+              <h3>⚡ عملیات‌های پاکسازی در حال اجرا</h3>
+              <span class="tag-live">زنده</span>
+            </div>
+            <div class="card-body" id="dashActiveJobsContainer">
+              <div class="empty-state">
+                <span class="empty-icon">☕</span>
+                <p>در حال حاضر هیچ عملیات پاکسازی در حال اجرایی وجود ندارد.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Activity Card -->
+          <div class="card glass-card">
+            <div class="card-header">
+              <h3>🕒 آخرین سوابق پاکسازی</h3>
+              <button class="btn-text" id="btnViewAllReports">مشاهده همه</button>
+            </div>
+            <div class="card-body" id="dashRecentJobsContainer">
+              <div class="empty-state">
+                <span class="empty-icon">📋</span>
+                <p>سابقه‌ای از پاکسازی ثبت نشده است.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab: Accounts Management -->
+      <section class="tab-pane" id="tab-accounts">
+        <!-- Account Filters & Bulk Actions Bar -->
+        <div class="toolbar glass-card">
+          <div class="toolbar-left">
+            <div class="search-box">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="accountSearchInput" placeholder="جستجو بر اساس شناسه، شماره یا برچسب...">
+            </div>
+            <div class="filter-pills">
+              <button class="filter-pill active" data-filter="all">همه</button>
+              <button class="filter-pill" data-filter="connected">متصل</button>
+              <button class="filter-pill" data-filter="needs_reauth">نیازمند ورود</button>
+              <button class="filter-pill" data-filter="busy">در حال پردازش</button>
+            </div>
+          </div>
+
+          <div class="toolbar-right">
+            <button class="btn btn-secondary btn-sm" id="btnBulkInspect" style="display:none;">
+              🔍 بررسی انتخاب‌شده‌ها (<span id="selectedCountInspect">0</span>)
+            </button>
+            <button class="btn btn-danger btn-sm" id="btnBulkDelete" style="display:none;">
+              🗑️ حذف انتخاب‌شده‌ها (<span id="selectedCount">0</span>)
+            </button>
+            <button class="btn btn-warning btn-sm" id="btnBulkClean" style="display:none;">
+              🧹 پاکسازی انتخاب‌شده‌ها (<span id="selectedCountClean">0</span>)
+            </button>
+          </div>
+        </div>
+
+        <!-- Accounts Table -->
+        <div class="table-container glass-card">
+          <table class="data-table" id="accountsTable">
+            <thead>
+              <tr>
+                <th width="40"><input type="checkbox" id="selectAllCheckbox"></th>
+                <th>شناسه داخلی</th>
+                <th>نام و برچسب</th>
+                <th>شماره موبایل</th>
+                <th>وضعیت نشست</th>
+                <th>تعداد عضویت‌ها</th>
+                <th>آخرین پاکسازی</th>
+                <th>عملیات</th>
+              </tr>
+            </thead>
+            <tbody id="accountsTableBody">
+              <tr>
+                <td colspan="8" class="text-center">در حال بارگذاری لیست حساب‌ها...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Tab: Live Cleaner -->
+      <section class="tab-pane" id="tab-cleaner">
+        <div class="cleaner-panel-header glass-card">
+          <div class="cleaner-intro">
+            <h2>🎛️ مانیتورینگ زنده عملیات پاکسازی</h2>
+            <p>مشاهده درصد پیشرفت ثانیه‌ای، کنترل توقف موقت (Pause) و از سرگیری (Resume) بر اساس قوانین پروتکل ایتا</p>
+          </div>
+          <div class="cleaner-actions">
+            <button class="btn btn-primary" id="btnStartBatchModal">🚀 شروع پاکسازی گروهی</button>
+          </div>
+        </div>
+
+        <div class="active-jobs-list" id="activeJobsList">
+          <div class="empty-state glass-card">
+            <span class="empty-icon">🎯</span>
+            <h3>صف عملیات خالی است</h3>
+            <p>یک یا چند حساب کاربری را از بخش مدیریت حساب‌ها انتخاب کرده و عملیات پاکسازی را آغاز کنید.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab: Reports & Logs -->
+      <section class="tab-pane" id="tab-reports">
+        <!-- Reports Toolbar -->
+        <div class="toolbar glass-card">
+          <div class="toolbar-left">
+            <div class="search-box">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="reportSearchInput" placeholder="جستجو بر اساس شناسه تسک یا حساب...">
+            </div>
+            <div class="filter-pills" id="reportFilterPills">
+              <button class="filter-pill active" data-report-filter="all">همه</button>
+              <button class="filter-pill" data-report-filter="completed">موفق</button>
+              <button class="filter-pill" data-report-filter="failed">دارای خطا</button>
+              <button class="filter-pill" data-report-filter="aborted">لغو شده</button>
+            </div>
+          </div>
+
+          <div class="toolbar-right">
+            <button class="btn btn-secondary btn-sm" id="btnRefreshReports">
+              🔄 بروزرسانی
+            </button>
+            <button class="btn btn-danger btn-sm" id="btnClearReports">
+              🗑️ پاکسازی تاریخچه
+            </button>
+          </div>
+        </div>
+
+        <div class="card glass-card">
+          <div class="card-header">
+            <h3>📑 تاریخچه و گزارشات جامع پاکسازی حساب‌ها</h3>
+            <span class="badge blue" id="reportsCountBadge">0 گزارش</span>
+          </div>
+          <div class="card-body">
+            <div class="table-container">
+              <table class="data-table" id="reportsTable">
+                <thead>
+                  <tr>
+                    <th>شناسه تسک</th>
+                    <th>حساب کاربری</th>
+                    <th>وضعیت نهایی</th>
+                    <th>کل اهداف</th>
+                    <th>ترک موفق</th>
+                    <th>خطاها</th>
+                    <th>زمان شروع</th>
+                    <th>زمان پایان / مدت</th>
+                    <th>عملیات</th>
+                  </tr>
+                </thead>
+                <tbody id="reportsTableBody">
+                  <tr>
+                    <td colspan="9" class="text-center">در حال بارگذاری گزارشات...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab: Settings (تنظیمات سیستم و نرخ همزمانی) -->
+      <section class="tab-pane" id="tab-settings">
+        <div class="settings-container">
+          
+          <div class="settings-grid">
+            
+            <!-- Card 1: Concurrency Settings -->
+            <div class="card glass-card">
+              <div class="card-header">
+                <div>
+                  <h3>⚡ پردازش همزمان حساب‌ها (Concurrency)</h3>
+                  <p class="card-subtitle">تعیین حداکثر تعداد اکانت‌هایی که به صورت مشترک در بررسی گروهی و صف پاکسازی پردازش می‌شوند</p>
+                </div>
+                <span class="badge blue" id="displayMaxConcurrencyBadge">۵ اکانت همزمان</span>
+              </div>
+              <div class="card-body">
+                <div class="form-group">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <label for="inputMaxConcurrency" style="margin-bottom:0;">سقف اکانت‌های همزمان (بررسی و پاکسازی):</label>
+                    <strong id="inputMaxConcurrencyVal" style="color:var(--primary); font-size:1.2rem; font-family:monospace;">۵</strong>
+                  </div>
+                  <div class="range-slider-wrapper" dir="ltr" style="direction: ltr;">
+                    <input type="range" class="form-range" id="inputMaxConcurrency" min="1" max="30" step="1" value="5" dir="ltr">
+                    <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--text-muted); margin-top:6px; direction: ltr;">
+                      <span>۱ (تک‌به‌تک و امن)</span>
+                      <span style="color:var(--primary); font-weight:600;">۵ (پیش‌فرض سیستم)</span>
+                      <span>۳۰ (حداکثر همزمانی و سرعت)</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="quick-preset-buttons" style="margin-top:16px;">
+                  <span style="font-size:0.85rem; color:var(--text-muted); margin-left:8px;">پیش‌تنظیم‌های سریع:</span>
+                  <button type="button" class="btn btn-secondary btn-sm btn-preset-concurrency" data-val="1">۱ حساب</button>
+                  <button type="button" class="btn btn-secondary btn-sm btn-preset-concurrency" data-val="3">۳ حساب</button>
+                  <button type="button" class="btn btn-secondary btn-sm btn-preset-concurrency" data-val="5">۵ حساب (پیش‌فرض)</button>
+                  <button type="button" class="btn btn-secondary btn-sm btn-preset-concurrency" data-val="10">۱۰ حساب</button>
+                  <button type="button" class="btn btn-secondary btn-sm btn-preset-concurrency" data-val="20">۲۰ حساب</button>
+                  <button type="button" class="btn btn-secondary btn-sm btn-preset-concurrency" data-val="30">۳۰ حساب (حداکثر)</button>
+                </div>
+
+                <div class="info-callout" style="margin-top:20px;">
+                  <span class="callout-icon">💡</span>
+                  <div class="callout-text">
+                    <strong>توضیح عملکرد مشترک:</strong> این تنظیم هم برای <strong>«بررسی و اسکن گروهی»</strong> و هم برای <strong>«صف پاکسازی حساب‌ها»</strong> اعمال می‌شود. به عنوان مثال، اگر عدد روی ۵ باشد، بررسی چت‌های حساب‌های انتخاب‌شده ۵ به ۵ با سرعت بالا انجام می‌پذیرد و در زمان پاکسازی نیز ۵ ورکر به طور همزمان کار خواهند کرد.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 2: Rate Limit & Anti-Flood Settings -->
+            <div class="card glass-card">
+              <div class="card-header">
+                <div>
+                  <h3>🛡️ کنترل تاخیر و ضد اسپم (Rate Limiting & Anti-Flood)</h3>
+                  <p class="card-subtitle">تنظیم فاصله زمانی هوشمند بین درخواست‌های خروج جهت جلوگیری از لیمیت یا مسدود شدن حساب‌ها</p>
+                </div>
+                <span class="badge green" id="displayDelayBadge">۱.۰ تا ۲.۵ ثانیه</span>
+              </div>
+              <div class="card-body">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                  <div class="form-group">
+                    <label for="inputMinDelay">حداقل تاخیر بین خروج‌ها (ثانیه):</label>
+                    <input type="number" class="form-control" id="inputMinDelay" min="0.5" max="30" step="0.5" value="1.0">
+                    <span style="font-size:0.75rem; color:var(--text-muted);">پیش‌فرض: ۱.۰ ثانیه</span>
+                  </div>
+                  <div class="form-group">
+                    <label for="inputMaxDelay">حداکثر تاخیر بین خروج‌ها (ثانیه):</label>
+                    <input type="number" class="form-control" id="inputMaxDelay" min="1.0" max="60" step="0.5" value="2.5">
+                    <span style="font-size:0.75rem; color:var(--text-muted);">پیش‌فرض: ۲.۵ ثانیه</span>
+                  </div>
+                </div>
+
+                <div class="form-group" style="margin-top:10px;">
+                  <label for="selectFloodAction">رفتار در مواجهه با خطای FLOOD_WAIT (محدودیت موقت سرور ایتا):</label>
+                  <select class="form-control" id="selectFloodAction">
+                    <option value="AUTO_WAIT">انتظار هوشمند تا پایان زمان لیمیت و ادامه خودکار (توصیه‌شده)</option>
+                    <option value="PAUSE">توقف موقت تسک (نیاز به زدن دکمه ادامه توسط کاربر)</option>
+                    <option value="ABORT">لغو و توقف کامل تسک این اکانت</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="inputMaxFloodWait">سقف مجاز زمان انتظار برای FLOOD_WAIT (ثانیه):</label>
+                  <input type="number" class="form-control" id="inputMaxFloodWait" min="10" max="3600" step="10" value="120">
+                  <span style="font-size:0.75rem; color:var(--text-muted);">اگر سرور زمان انتظاری طولانی‌تر از این مقدار اعلام کند، واکنش بالا به صورت خودکار اعمال می‌شود.</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 3: Safety & Cleaning Rules -->
+            <div class="card glass-card">
+              <div class="card-header">
+                <div>
+                  <h3>🔒 قوانین محافظت و ایمنی (Safety Rules)</h3>
+                  <p class="card-subtitle">قوانین ایمنی برای حفظ کانال‌ها و گروه‌های مهم و پاکسازی تاریخچه چت‌ها</p>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="toggle-group" style="display:flex; flex-direction:column; gap:16px;">
+                  <label class="toggle-item glass-card" style="display:flex; align-items:center; justify-content:space-between; padding:16px; border-radius:12px; cursor:pointer;">
+                    <div>
+                      <strong style="display:block; margin-bottom:4px; color:var(--text-main);">👑 محافظت از کانال‌ها و گروه‌های تحت مالکیت (Creator Protection)</strong>
+                      <span style="font-size:0.85rem; color:var(--text-muted);">حساب کاربری از چت‌هایی که خودش سازنده یا مالک آن‌ها است هرگز خارج نمی‌شود تا کانال یا گروه از بین نرود.</span>
+                    </div>
+                    <input type="checkbox" id="checkProtectCreator" checked style="width:20px; height:20px; accent-color:var(--primary); cursor:pointer;">
+                  </label>
+
+                  <label class="toggle-item glass-card" style="display:flex; align-items:center; justify-content:space-between; padding:16px; border-radius:12px; cursor:pointer;">
+                    <div>
+                      <strong style="display:block; margin-bottom:4px; color:var(--text-main);">🗑️ حذف کامل تاریخچه گفتگو پس از خروج (Clear History)</strong>
+                      <span style="font-size:0.85rem; color:var(--text-muted);">پس از خروج موفق از هر کانال یا گروه، تاریخچه پیام‌ها از حساب نیز حذف شود.</span>
+                    </div>
+                    <input type="checkbox" id="checkAutoDeleteHistory" checked style="width:20px; height:20px; accent-color:var(--primary); cursor:pointer;">
+                  </label>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Bottom Actions Bar -->
+          <div class="settings-actions-bar glass-card" style="margin-top:24px; padding:20px; display:flex; justify-content:space-between; align-items:center;">
+            <button type="button" class="btn btn-secondary" id="btnResetSettings">
+              <span>🔄 بازنشانی به مقادیر پیش‌فرض</span>
+            </button>
+            <button type="button" class="btn btn-primary" id="btnSaveSettings" style="min-width:180px;">
+              <span>💾 ذخیره و اعمال تنظیمات</span>
+            </button>
+          </div>
+
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal: Add Account (Multi-step Auth) -->
+  <div class="modal-backdrop" id="modalAddAccount" style="display:none;">
+    <div class="modal glass-card">
+      <div class="modal-header">
+        <h3 id="modalAuthTitle">🔐 افزودن حساب جدید ایتا</h3>
+        <button class="modal-close" id="btnCloseAddModal">×</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Step 1: Phone Input -->
+        <div id="authStep1">
+          <p class="modal-desc">شماره موبایل حساب مالک را وارد کنید تا کد تأیید ورود از طریق پیام‌رسان ایتا ارسال شود.</p>
+          <div class="form-group">
+            <label>شماره موبایل (ایتا):</label>
+            <input type="tel" id="inputPhone" placeholder="09123456789 یا +989123456789" class="form-control" dir="ltr">
+          </div>
+          <div class="form-group">
+            <label>برچسب / نام داخلی (اختیاری):</label>
+            <input type="text" id="inputLabel" placeholder="مثلاً: اکانت پشتیبانی ۱" class="form-control">
+          </div>
+          <button class="btn btn-primary btn-block" id="btnSendCode">
+            <span>ارسال کد تأیید</span>
+          </button>
+        </div>
+
+        <!-- Step 2: OTP Verification -->
+        <div id="authStep2" style="display:none;">
+          <p class="modal-desc">کد ۵ رقمی ارسال‌شده در برنامه ایتا برای شماره <strong id="displayPhone"></strong> را وارد نمایید:</p>
+          <div class="form-group">
+            <label>کد تأیید ورود (OTP):</label>
+            <input type="text" id="inputOtp" placeholder="مثال: 48291" class="form-control text-center otp-input" dir="ltr" maxlength="6">
+          </div>
+          <div class="otp-timer-box">
+            <span>مدت زمان اعتبار: </span>
+            <strong id="otpCountdown">02:00</strong>
+          </div>
+          <button class="btn btn-success btn-block" id="btnVerifyCode">
+            <span>تأیید و اتصال امن نشست</span>
+          </button>
+          <button class="btn-text btn-block mt-2" id="btnBackToStep1">تغییر شماره موبایل</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Dialog Inspection & Selection -->
+  <div class="modal-backdrop" id="modalDialogs" style="display:none; z-index:1600;">
+    <div class="modal modal-lg glass-card">
+      <div class="modal-header">
+        <h3 id="dialogsModalTitle">فهرست کانال‌ها و گروه‌های حساب</h3>
+        <button class="modal-close" id="btnCloseDialogsModal">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="dialogs-summary-bar">
+          <span class="badge blue">تعداد کل کانال‌ها: <strong id="dlgTotalChannels">0</strong></span>
+          <span class="badge purple">تعداد کل گروه‌ها: <strong id="dlgTotalGroups">0</strong></span>
+        </div>
+        <div class="dialogs-options">
+          <label><input type="radio" name="cleanMode" value="FULL_CLEAN" checked> پاکسازی کامل (ترک تمام موارد به جز کانال‌های تحت مالکیت)</label>
+          <label><input type="radio" name="cleanMode" value="SELECTIVE"> پاکسازی انتخابی (فقط موارد تیک‌خورده ترک شوند)</label>
+        </div>
+        <div class="dialogs-table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th width="40"><input type="checkbox" id="selectAllDialogs"></th>
+                <th>نام و عنوان</th>
+                <th>نوع</th>
+                <th>تعداد اعضا</th>
+                <th>وضعیت دسترسی</th>
+              </tr>
+            </thead>
+            <tbody id="dialogsTableBody">
+              <tr>
+                <td colspan="5" class="text-center">در حال دریافت چت‌ها از سرور ایتا...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="btnCancelClean">انصراف</button>
+          <button class="btn btn-warning" id="btnConfirmClean">🧹 شروع پاکسازی حساب</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Job Details & Log Items -->
+  <div class="modal-backdrop" id="modalJobDetails" style="display:none;">
+    <div class="modal modal-lg glass-card">
+      <div class="modal-header">
+        <h3 id="jobDetailsTitle">📋 جزئیات عملیات پاکسازی</h3>
+        <button class="modal-close" id="btnCloseJobDetailsModal">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="dialogs-summary-bar" id="jobDetailsSummaryBar">
+          <span class="badge blue">شناسه: <strong id="jdJobId">-</strong></span>
+          <span class="badge green">موفق: <strong id="jdSuccessCount">0</strong></span>
+          <span class="badge red">خطا: <strong id="jdFailCount">0</strong></span>
+          <span class="badge purple">وضعیت: <strong id="jdStatus">-</strong></span>
+        </div>
+        <div id="jobFailureSummaryBox" style="display:none; padding:10px 14px; margin-bottom:14px; border-radius:10px; background:rgba(239, 68, 68, 0.15); border:1px solid rgba(239, 68, 68, 0.3); color:#fca5a5; font-size:0.9rem;">
+        </div>
+        <div class="dialogs-table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>نام و عنوان</th>
+                <th>نوع</th>
+                <th>شناسه دیالوگ</th>
+                <th>وضعیت خروج</th>
+                <th>کد / شرح خطا</th>
+                <th>زمان پردازش</th>
+              </tr>
+            </thead>
+            <tbody id="jobItemsTableBody">
+              <tr>
+                <td colspan="6" class="text-center">در حال بارگذاری لاگ‌های این تسک...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="btnCloseJobDetailsBtn">بستن</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Bulk Accounts Inspect (بررسی گروهی حساب‌ها) -->
+  <div class="modal-backdrop" id="modalBulkInspect" style="display:none; z-index:1500;">
+    <div class="modal modal-lg glass-card">
+      <div class="modal-header">
+        <h3 id="bulkInspectTitle">🔍 بررسی و اسکن گروهی حساب‌های کاربری</h3>
+        <button class="modal-close" id="btnCloseBulkInspectModal">×</button>
+      </div>
+      <div class="modal-body">
+        <!-- Live Progress Bar -->
+        <div class="bulk-inspect-progress-box" style="margin-bottom: 20px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+            <span id="bulkInspectProgressText" style="font-weight:600; color:var(--text-main);">آماده‌سازی برای اسکن...</span>
+            <strong id="bulkInspectProgressPercent" style="color:var(--primary);">۰٪</strong>
+          </div>
+          <div class="progress-bar-container" style="height:10px; margin-bottom:0;">
+            <div class="progress-bar-fill" id="bulkInspectProgressBar" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- Summary KPIs -->
+        <div class="dialogs-summary-bar" style="margin-bottom: 20px;">
+          <span class="badge blue">حساب‌ها: <strong id="biAccountsCount">0</strong></span>
+          <span class="badge green">کانال‌های شناسایی‌شده: <strong id="biTotalChannels">0</strong></span>
+          <span class="badge purple">گروه‌های شناسایی‌شده: <strong id="biTotalGroups">0</strong></span>
+          <span class="badge yellow">نیازمند ورود: <strong id="biFailedCount">0</strong></span>
+        </div>
+
+        <!-- Accounts Scan Table -->
+        <div class="dialogs-table-wrapper" style="max-height: 320px; overflow-y:auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>شناسه داخلی</th>
+                <th>نام و برچسب</th>
+                <th>شماره موبایل</th>
+                <th>وضعیت اسکن</th>
+                <th>کانال‌ها</th>
+                <th>گروه‌ها</th>
+                <th>عملیات</th>
+              </tr>
+            </thead>
+            <tbody id="bulkInspectTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="modal-footer" style="margin-top: 20px; display:flex; justify-content:space-between; align-items:center;">
+          <button class="btn btn-secondary" id="btnCloseBulkInspectBtn">بستن</button>
+          <div style="display:flex; gap:10px;">
+            <button class="btn btn-warning" id="btnBulkInspectCleanAll" style="display:none;">🧹 شروع پاکسازی همزمان موارد اسکن‌شده</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Custom Confirmation / Alert Dialog -->
+  <div class="modal-backdrop" id="modalConfirmDialog" style="display:none; z-index:2100;">
+    <div class="modal modal-dialog glass-card" id="confirmDialogBox">
+      <div class="dialog-icon-wrapper warning" id="dialogIconWrapper">
+        <span class="dialog-icon" id="dialogIcon">⚠️</span>
+      </div>
+      <div class="dialog-content">
+        <h3 id="dialogTitle">تأیید عملیات</h3>
+        <p id="dialogMessage">آیا از انجام این عملیات اطمینان دارید؟</p>
+      </div>
+      <div class="dialog-actions">
+        <button class="btn btn-secondary" id="dialogBtnCancel">انصراف</button>
+        <button class="btn btn-danger" id="dialogBtnConfirm">تأیید و ادامه</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="toast-container"></div>
+  <script src="/static/js/app.js?v=1.1.4"></script>
+</body>
+</html>
