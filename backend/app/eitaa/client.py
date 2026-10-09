@@ -242,7 +242,7 @@ class EitaaClient:
                 "error_code": result.get("error_code"),
                 "error_message": result.get("error_message")
             }
-        if result.get("type") != "rpc_result":
+        if result.get("type") == "error":
             return {
                 "success": False,
                 "error_code": result.get("code", 500),
@@ -263,7 +263,7 @@ class EitaaClient:
                 "error_code": result.get("error_code"),
                 "error_message": result.get("error_message")
             }
-        if result.get("type") != "rpc_result":
+        if result.get("type") == "error":
             return {
                 "success": False,
                 "error_code": result.get("code", 500),
@@ -283,7 +283,7 @@ class EitaaClient:
                 "error_code": result.get("error_code"),
                 "error_message": result.get("error_message")
             }
-        if result.get("type") != "rpc_result":
+        if result.get("type") == "error":
             return {
                 "success": False,
                 "error_code": result.get("code", 500),

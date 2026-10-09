@@ -77,6 +77,22 @@ class CleaningEngine:
         if self.is_running:
             return
         self.is_running = True
+
+        # Recover any stuck jobs from previous ungraceful shutdown
+        try:
+            async with AsyncSessionLocal() as session:
+                await session.execute(
+                    update(CleaningJob).where(CleaningJob.status.in_(["RUNNING", "PENDING"])).values(
+                        status="ABORTED", finished_at=utc_now()
+                    )
+                )
+                await session.execute(
+                    update(Account).where(Account.status == "BUSY").values(status="CONNECTED")
+                )
+                await session.commit()
+        except Exception:
+            pass
+
         for i in range(self.max_concurrency):
             worker = asyncio.create_task(self._worker_loop(i + 1))
             self.workers.append(worker)

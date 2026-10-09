@@ -8,6 +8,7 @@ CODE_SETTINGS_ID = 0xdebebe83
 AUTH_SEND_CODE_ID = 0xa677244f
 AUTH_SIGN_IN_ID = 0xbcd51581
 RPC_ERROR_ID = 0x2144ca19
+EITAA_RPC_ERROR_ID = 0xc4b9f9bb
 RPC_RESULT_ID = 0xf35c6d01
 GZIP_PACKED_ID = 0x3072c41e
 VECTOR_ID = 0x1cb5c415
@@ -204,7 +205,7 @@ def parse_eitaa_response(data: bytes) -> Dict[str, Any]:
             inner_cid = reader.read_uint()
 
             # Check if inner content is directly an RPC error
-            if inner_cid == RPC_ERROR_ID:
+            if inner_cid in (RPC_ERROR_ID, EITAA_RPC_ERROR_ID):
                 code = reader.read_int()
                 msg = reader.read_string()
                 return {
@@ -222,7 +223,7 @@ def parse_eitaa_response(data: bytes) -> Dict[str, Any]:
                     if len(decompressed) >= 4:
                         decomp_reader = TLReader(decompressed)
                         inner_decomp_cid = decomp_reader.read_uint()
-                        if inner_decomp_cid == RPC_ERROR_ID:
+                        if inner_decomp_cid in (RPC_ERROR_ID, EITAA_RPC_ERROR_ID):
                             code = decomp_reader.read_int()
                             msg = decomp_reader.read_string()
                             return {
@@ -248,8 +249,8 @@ def parse_eitaa_response(data: bytes) -> Dict[str, Any]:
                 "raw_bytes": data[12:] # Exclude rpc_result header and req_msg_id
             }
 
-    # RPC Error constructor
-    if cid == RPC_ERROR_ID:
+    # Top-level RPC Error constructor
+    if cid in (RPC_ERROR_ID, EITAA_RPC_ERROR_ID):
         code = reader.read_int()
         msg = reader.read_string()
         return {
