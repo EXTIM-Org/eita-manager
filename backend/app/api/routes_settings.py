@@ -19,7 +19,8 @@ class SettingsUpdateRequest(BaseModel):
 async def get_system_settings():
     """Get current system settings."""
     cfg = load_settings()
-    # Ensure hardcoded balanced values are reflected
+    # Ensure hardcoded balanced values and 50 concurrency are reflected
+    cfg["max_concurrency"] = 50
     cfg["min_delay"] = 1.0
     cfg["max_delay"] = 2.5
     cfg["flood_wait_action"] = "AUTO_WAIT"
@@ -33,7 +34,8 @@ async def get_system_settings():
 async def update_system_settings(req: SettingsUpdateRequest):
     """Update system settings and apply immediately to cleaner engine."""
     data = req.model_dump()
-    # Enforce standard balanced anti-flood parameters
+    # Enforce standard balanced anti-flood parameters and 50 concurrency
+    data["max_concurrency"] = 50
     data["min_delay"] = 1.0
     data["max_delay"] = 2.5
     data["flood_wait_action"] = "AUTO_WAIT"

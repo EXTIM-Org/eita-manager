@@ -292,51 +292,21 @@
           
           <div class="settings-grid">
             
-            <!-- Card 1: Concurrency Settings -->
-            <div class="card glass-card">
-              <div class="card-header">
-                <div>
-                  <h3>⚡ پردازش همزمان حساب‌ها (Concurrency)</h3>
-                  <p class="card-subtitle">تعیین حداکثر تعداد اکانت‌هایی که به صورت مشترک در بررسی گروهی و صف پاکسازی پردازش می‌شوند</p>
-                </div>
-                <span class="badge blue" id="displayMaxConcurrencyBadge">۵ اکانت همزمان</span>
-              </div>
-              <div class="card-body">
-                <div class="form-group">
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <label for="inputMaxConcurrency" style="margin-bottom:0;">سقف اکانت‌های همزمان (بررسی و پاکسازی):</label>
-                    <strong id="inputMaxConcurrencyVal" style="color:var(--primary); font-size:1.2rem; font-family:monospace;">۵</strong>
-                  </div>
-                  <div class="range-slider-wrapper" dir="ltr" style="direction: ltr;">
-                    <input type="range" class="form-range" id="inputMaxConcurrency" min="1" max="50" step="1" value="5" dir="ltr">
-                    <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--text-muted); margin-top:6px; direction: ltr;">
-                      <span>۱ (تک‌به‌تک و امن)</span>
-                      <span style="color:var(--primary); font-weight:600;">۵ (پیش‌فرض)</span>
-                      <span>۵۰ (حداکثر سرعت و همزمانی)</span>
-                    </div>
+            <!-- System Status Info Card -->
+            <div class="card glass-card" style="margin-bottom: 24px; border: 1px solid rgba(59, 130, 246, 0.3); background: rgba(59, 130, 246, 0.05);">
+              <div class="card-header" style="border-bottom:none; padding-bottom:0;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                  <span style="font-size:1.8rem;">⚡</span>
+                  <div>
+                    <h3 style="margin-bottom:4px; color:var(--text-main);">پیکربندی خودکار و صف‌بندی هوشمند حساب‌ها (ثابت روی ۵۰ اکانت)</h3>
+                    <p class="card-subtitle" style="margin-bottom:0;">سیستم به طور دائمی تا ۵۰ حساب را به صورت همزمان (۲ خروج موازی در هر حساب) پردازش می‌کند. در صورتی که تعداد حساب‌ها بیشتر از ۵۰ باشد، سایر حساب‌ها به صورت خودکار در صف امن قرار گرفته و با آزاد شدن هر ورکر بلافاصله پردازش می‌شوند تا عملیات برای همه حساب‌ها ۱۰۰٪ تکمیل گردد.</p>
                   </div>
                 </div>
-
-                <div class="quick-preset-buttons" style="margin-top:16px;">
-                  <span style="font-size:0.85rem; color:var(--text-muted); margin-left:8px;">پیش‌تنظیم‌های سریع:</span>
-                  <button type="button" class="btn btn-secondary btn-sm btn-preset-concurrency" data-val="1">۱ حساب</button>
-                  <button type="button" class="btn btn-secondary btn-sm btn-preset-concurrency" data-val="5">۵ حساب</button>
-                  <button type="button" class="btn btn-secondary btn-sm btn-preset-concurrency" data-val="10">۱۰ حساب</button>
-                  <button type="button" class="btn btn-secondary btn-sm btn-preset-concurrency" data-val="20">۲۰ حساب</button>
-                  <button type="button" class="btn btn-secondary btn-sm btn-preset-concurrency" data-val="30">۳۰ حساب</button>
-                  <button type="button" class="btn btn-secondary btn-sm btn-preset-concurrency" data-val="50">۵۰ حساب (سقف حداکثر)</button>
-                </div>
-
-                <div class="info-callout" style="margin-top:20px;">
-                  <span class="callout-icon">💡</span>
-                  <div class="callout-text">
-                    <strong>توضیح عملکرد مشترک:</strong> این تنظیم هم برای <strong>«بررسی و اسکن گروهی»</strong> و هم برای <strong>«صف پاکسازی حساب‌ها»</strong> اعمال می‌شود. به عنوان مثال، اگر عدد روی ۵ باشد، بررسی چت‌های حساب‌های انتخاب‌شده ۵ به ۵ با سرعت بالا انجام می‌پذیرد و در زمان پاکسازی نیز ۵ ورکر به طور همزمان کار خواهند کرد.
-                  </div>
-                </div>
+                <span class="badge blue" style="white-space:nowrap;">۵۰ اکانت همزمان</span>
               </div>
             </div>
 
-            <!-- Card 2: Safety & Cleaning Rules -->
+            <!-- Card: Safety & Cleaning Rules -->
             <div class="card glass-card">
               <div class="card-header">
                 <div>

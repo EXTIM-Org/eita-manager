@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 SETTINGS_FILE = DATA_DIR / "settings.json"
 
 DEFAULT_SETTINGS: Dict[str, Any] = {
-    "max_concurrency": 5,
+    "max_concurrency": 50,
     "min_delay": 1.0,
     "max_delay": 2.5,
     "flood_wait_action": "AUTO_WAIT",  # AUTO_WAIT, PAUSE, ABORT

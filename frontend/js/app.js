@@ -120,14 +120,10 @@ const elements = {
   selectAllDialogs: document.getElementById('selectAllDialogs'),
 
   // Settings Elements
-  inputMaxConcurrency: document.getElementById('inputMaxConcurrency'),
-  inputMaxConcurrencyVal: document.getElementById('inputMaxConcurrencyVal'),
-  displayMaxConcurrencyBadge: document.getElementById('displayMaxConcurrencyBadge'),
   checkProtectCreator: document.getElementById('checkProtectCreator'),
   checkAutoDeleteHistory: document.getElementById('checkAutoDeleteHistory'),
   btnSaveSettings: document.getElementById('btnSaveSettings'),
-  btnResetSettings: document.getElementById('btnResetSettings'),
-  presetConcurrencyBtns: document.querySelectorAll('.btn-preset-concurrency')
+  btnResetSettings: document.getElementById('btnResetSettings')
 };
 
 // Utilities: Persian Numbers & Notifications
@@ -483,24 +479,13 @@ async function fetchSettings() {
 
 function applySettingsToUI(cfg) {
   if (!cfg) return;
-
-  if (elements.inputMaxConcurrency) {
-    elements.inputMaxConcurrency.value = cfg.max_concurrency || 5;
-    if (elements.inputMaxConcurrencyVal) {
-      elements.inputMaxConcurrencyVal.innerText = toPersianDigits(cfg.max_concurrency || 5);
-    }
-    if (elements.displayMaxConcurrencyBadge) {
-      elements.displayMaxConcurrencyBadge.innerText = `${toPersianDigits(cfg.max_concurrency || 5)} اکانت همزمان`;
-    }
-  }
-
   if (elements.checkProtectCreator) elements.checkProtectCreator.checked = cfg.protect_creator_dialogs !== false;
   if (elements.checkAutoDeleteHistory) elements.checkAutoDeleteHistory.checked = cfg.auto_delete_history !== false;
 }
 
 async function saveSettings() {
   const payload = {
-    max_concurrency: parseInt(elements.inputMaxConcurrency?.value) || 5,
+    max_concurrency: 50,
     min_delay: 1.0,
     max_delay: 2.5,
     flood_wait_action: 'AUTO_WAIT',
@@ -814,9 +799,8 @@ async function startBulkInspect(accountIds) {
     }).join('');
   }
 
-  // Parallel inspection using system concurrency setting
-  const concurrencyLimit = Math.max(1, Math.min(state.settings.max_concurrency || 5, total));
-  const minDelaySec = state.settings.min_delay !== undefined ? state.settings.min_delay : 1.0;
+  // Parallel inspection using standard system concurrency (up to 50 workers)
+  const concurrencyLimit = Math.max(1, Math.min(50, total));
 
   let nextIndex = 0;
   let completedCount = 0;
@@ -1903,25 +1887,6 @@ function setupEventListeners() {
   });
 
   // Settings Controls & Listeners
-  if (elements.inputMaxConcurrency) {
-    elements.inputMaxConcurrency.addEventListener('input', (e) => {
-      const val = e.target.value;
-      if (elements.inputMaxConcurrencyVal) elements.inputMaxConcurrencyVal.innerText = toPersianDigits(val);
-      if (elements.displayMaxConcurrencyBadge) elements.displayMaxConcurrencyBadge.innerText = `${toPersianDigits(val)} اکانت همزمان`;
-    });
-  }
-
-  if (elements.presetConcurrencyBtns) {
-    elements.presetConcurrencyBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const val = btn.getAttribute('data-val');
-        if (elements.inputMaxConcurrency) {
-          elements.inputMaxConcurrency.value = val;
-          elements.inputMaxConcurrency.dispatchEvent(new Event('input'));
-        }
-      });
-    });
-  }
 
 
   if (elements.btnSaveSettings) {

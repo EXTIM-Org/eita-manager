@@ -35,8 +35,8 @@ class CleaningEngine:
         self.active_tasks: Dict[str, CleaningTask] = {}
         self.task_queue: asyncio.Queue = asyncio.Queue()
         cfg = load_settings()
-        self.max_concurrency = int(cfg.get("max_concurrency", 5))
-        # Standard balanced anti-flood settings (hardcoded)
+        # Hardcoded: 50 concurrent accounts and standard balanced anti-flood settings
+        self.max_concurrency = 50
         self.min_delay = 1.0
         self.max_delay = 2.5
         self.flood_wait_action = "AUTO_WAIT"
@@ -48,22 +48,14 @@ class CleaningEngine:
         self.is_running = False
 
     def apply_settings(self, cfg: dict):
-        # Standard balanced mode is permanently hardcoded
+        # Concurrency (50 accounts) and standard balanced anti-flood mode are permanently hardcoded
+        self.max_concurrency = 50
         self.min_delay = 1.0
         self.max_delay = 2.5
         self.flood_wait_action = "AUTO_WAIT"
         self.max_flood_wait_seconds = 120
         self.protect_creator_dialogs = bool(cfg.get("protect_creator_dialogs", self.protect_creator_dialogs))
         self.auto_delete_history = bool(cfg.get("auto_delete_history", self.auto_delete_history))
-
-        new_concurrency = int(cfg.get("max_concurrency", self.max_concurrency))
-        old_concurrency = self.max_concurrency
-        self.max_concurrency = new_concurrency
-
-        if self.is_running and new_concurrency > old_concurrency:
-            for i in range(old_concurrency, new_concurrency):
-                worker = asyncio.create_task(self._worker_loop(i + 1))
-                self.workers.append(worker)
 
     def set_broadcaster(self, broadcaster: Callable):
         self.ws_broadcaster = broadcaster
