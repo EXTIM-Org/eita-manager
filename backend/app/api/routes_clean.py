@@ -81,8 +81,8 @@ async def scan_account_dialogs(account_id: int, db: AsyncSession = Depends(get_d
             )
             db.add(snap)
 
-        channels_count = sum(1 for it in new_items if it["type"] in ["channel", "supergroup"])
-        groups_count = sum(1 for it in new_items if it["type"] == "basic_group")
+        channels_count = sum(1 for it in new_items if it["type"] == "channel")
+        groups_count = sum(1 for it in new_items if it["type"] in ["supergroup", "basic_group", "group"])
 
         account.total_channels_cached = channels_count
         account.total_groups_cached = groups_count

@@ -977,8 +977,9 @@ function renderDialogsTable(items) {
   }
 
   elements.dialogsTableBody.innerHTML = items.map(item => {
-    const isChannel = item.type === 'channel' || item.type === 'supergroup';
-    const typeLabel = isChannel ? 'کانال' : 'گروه';
+    const isChannel = item.type === 'channel';
+    const typeLabel = isChannel ? 'کانال' : (item.type === 'supergroup' ? 'سوپرگروه' : 'گروه');
+    const badgeColor = isChannel ? 'blue' : 'purple';
     const ownerBadge = item.is_creator 
       ? '<span class="status-badge busy">👑 مالک/سازنده (محافظت‌شده)</span>'
       : (item.is_admin ? '<span class="status-badge connected">🛡️ ادمین</span>' : '<span style="color:var(--text-muted); font-size:0.8rem;">عضو عادی</span>');
@@ -992,7 +993,7 @@ function renderDialogsTable(items) {
           <strong>${item.title || 'بدون عنوان'}</strong>
           <span style="font-size:0.75rem; color:var(--text-subtle); display:block;">شناسه: ${item.peer_id}</span>
         </td>
-        <td>${typeLabel}</td>
+        <td><span class="badge ${badgeColor}" style="font-size:0.75rem;">${typeLabel}</span></td>
         <td>${toPersianDigits(item.members_count || 0)}</td>
         <td>${ownerBadge}</td>
       </tr>
@@ -1045,7 +1046,9 @@ function renderJobModalTable() {
 
   elements.jobItemsTableBody.innerHTML = filtered.map(it => {
     const isSuccess = it.status === 'LEFT_SUCCESS';
-    const typeLabel = (it.peer_type === 'channel' || it.peer_type === 'supergroup') ? 'کانال' : 'گروه';
+    const isChannel = it.peer_type === 'channel';
+    const typeLabel = isChannel ? 'کانال' : (it.peer_type === 'supergroup' ? 'سوپرگروه' : 'گروه');
+    const badgeColor = isChannel ? 'blue' : 'purple';
     const statusBadge = isSuccess 
       ? '<span class="status-badge connected">✅ ترک شد</span>'
       : '<span class="status-badge needs_reauth">❌ خطا</span>';
@@ -1057,7 +1060,7 @@ function renderJobModalTable() {
     return `
       <tr>
         <td><strong>${it.peer_title || 'بدون نام'}</strong></td>
-        <td><span class="badge blue" style="font-size:0.75rem;">${typeLabel}</span></td>
+        <td><span class="badge ${badgeColor}" style="font-size:0.75rem;">${typeLabel}</span></td>
         <td dir="ltr" style="font-family:monospace; font-size:0.8rem; color:var(--text-muted);">${it.peer_id}</td>
         <td>${statusBadge}</td>
         <td style="font-size:0.8rem; color:${isSuccess ? 'var(--text-muted)' : '#f87171'}; font-weight:${isSuccess ? 'normal' : '500'};">

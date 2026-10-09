@@ -220,8 +220,8 @@ class EitaaClient:
             await asyncio.sleep(0.1)
 
         chats = list(all_chats.values())
-        channels = [c for c in chats if c["type"] in ("channel", "supergroup")]
-        groups = [c for c in chats if c["type"] == "basic_group"]
+        channels = [c for c in chats if c["type"] == "channel"]
+        groups = [c for c in chats if c["type"] in ("supergroup", "basic_group", "group")]
 
         return {
             "success": True,

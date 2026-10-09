@@ -551,8 +551,8 @@ class CleaningEngine:
                     select(DialogSnapshot).where(DialogSnapshot.account_id == task.account_id)
                 )
                 all_rem = rem_res.scalars().all()
-                ch_rem = sum(1 for x in all_rem if x.peer_type in ["channel", "supergroup"])
-                gr_rem = sum(1 for x in all_rem if x.peer_type == "basic_group")
+                ch_rem = sum(1 for x in all_rem if x.peer_type == "channel")
+                gr_rem = sum(1 for x in all_rem if x.peer_type in ["supergroup", "basic_group", "group"])
 
                 await session.execute(
                     update(Account).where(Account.id == task.account_id).values(
