@@ -187,6 +187,37 @@ class CleaningEngine:
             return True
         return False
 
+    async def abort_all(self) -> int:
+        count = 0
+        for task in list(self.active_tasks.values()):
+            if task.state in ["PENDING", "RUNNING", "PAUSED"]:
+                task.abort_requested = True
+                task.state = "ABORTED"
+                task.pause_event.set()
+                count += 1
+
+        # Clear remaining queued tasks
+        while not self.task_queue.empty():
+            try:
+                self.task_queue.get_nowait()
+                self.task_queue.task_done()
+            except Exception:
+                break
+
+        async with AsyncSessionLocal() as session:
+            await session.execute(
+                update(CleaningJob).where(CleaningJob.status.in_(["PENDING", "RUNNING", "PAUSED"])).values(
+                    status="ABORTED", finished_at=utc_now()
+                )
+            )
+            await session.execute(
+                update(Account).where(Account.status == "BUSY").values(status="CONNECTED")
+            )
+            await session.commit()
+
+        await self.broadcast("ALL_JOBS_ABORTED", {})
+        return count
+
     async def _worker_loop(self, worker_id: int):
         while self.is_running:
             if worker_id > self.max_concurrency:

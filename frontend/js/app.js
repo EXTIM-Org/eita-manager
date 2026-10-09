@@ -1725,6 +1725,32 @@ function setupEventListeners() {
     }
   });
 
+  const btnAbortAllJobs = document.getElementById('btnAbortAllJobs');
+  if (btnAbortAllJobs) {
+    btnAbortAllJobs.addEventListener('click', async () => {
+      const ok = await showConfirm({
+        title: 'توقف کامل تمام تسک‌ها',
+        message: 'آیا اطمینان دارید که می‌خواهید تمام عملیات‌های پاکسازی در حال اجرا و صف‌بندی‌شده را فوراً متوقف کنید؟',
+        confirmText: 'بله، همه را متوقف کن',
+        type: 'danger',
+        icon: '🛑'
+      });
+      if (!ok) return;
+
+      try {
+        const res = await fetch('/api/v1/clean/abort-all', { method: 'POST' });
+        const json = await res.json();
+        showToast(json.message || 'تمام تسک‌ها لغو و متوقف شدند', 'info');
+        state.activeJobs = {};
+        renderActiveJobs();
+        fetchAccounts();
+        fetchStats();
+      } catch (err) {
+        showToast('خطا در توقف تسک‌ها', 'error');
+      }
+    });
+  }
+
   elements.btnViewAllReports.addEventListener('click', () => {
     document.querySelector('[data-tab="reports"]').click();
   });

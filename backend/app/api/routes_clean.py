@@ -175,6 +175,16 @@ async def handle_job_action(job_id: str, req: JobActionRequest):
         "message": f"دستور {action} با موفقیت اعمال شد."
     }
 
+@router.post("/abort-all")
+async def abort_all_jobs():
+    """Abort all running and queued cleaning jobs immediately."""
+    count = await cleaner_engine.abort_all()
+    return {
+        "success": True,
+        "data": {"aborted_count": count},
+        "message": f"تمام عملیات‌های پاکسازی ({count} تسک) لغو و متوقف شدند."
+    }
+
 @router.get("/active-jobs")
 async def get_active_jobs():
     jobs = []
