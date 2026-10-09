@@ -334,17 +334,28 @@ class CleaningEngine:
             account_id=task.account_id
         )
 
-        try:
-            for index, target in enumerate(targets):
-                if task.abort_requested:
-                    break
+        concurrency = max(1, self.max_concurrency)
+        sem = asyncio.Semaphore(concurrency)
+        processed_count = 0
+        lock = asyncio.Lock()
 
-                # Wait if paused
+        async def process_target(target):
+            nonlocal processed_count
+            if task.abort_requested:
+                return
+
+            await task.pause_event.wait()
+            if task.abort_requested:
+                return
+
+            async with sem:
+                if task.abort_requested:
+                    return
+
                 await task.pause_event.wait()
                 if task.abort_requested:
-                    break
+                    return
 
-                # Attempt leave
                 peer_id_int = int(target.peer_id) if target.peer_id.isdigit() else 0
                 leave_success = False
                 error_msg = None
@@ -357,95 +368,86 @@ class CleaningEngine:
                 else:
                     res = await client.delete_chat_user(chat_id=peer_id_int)
                     if res.get("success") and self.auto_delete_history:
-                        # For basic groups, we don't have access_hash, pass 0
                         await client.delete_channel_history(channel_id=peer_id_int, access_hash=0, is_channel=False)
 
-                if res.get("success"):
-                    leave_success = True
-                    task.success_count += 1
-                else:
-                    err_text = res.get("error_message", "Unknown error")
-                    error_code = str(res.get("error_code", "ERROR"))
-                    error_msg = err_text
+                async with lock:
+                    if res.get("success"):
+                        leave_success = True
+                        task.success_count += 1
+                    else:
+                        err_text = res.get("error_message", "Unknown error")
+                        error_code = str(res.get("error_code", "ERROR"))
+                        error_msg = err_text
 
-                    # Handle FLOOD_WAIT
-                    if "FLOOD_WAIT" in err_text.upper():
-                        wait_seconds = 30
-                        # Extract number if present
-                        parts = err_text.split("_")
-                        if len(parts) >= 3 and parts[-1].isdigit():
-                            wait_seconds = int(parts[-1])
-                        
-                        await self.broadcast("FLOOD_WAIT_WARNING", {
-                            "job_id": task.job_id,
-                            "account_id": task.account_id,
-                            "wait_seconds": wait_seconds
-                        })
+                        # Handle FLOOD_WAIT
+                        if "FLOOD_WAIT" in err_text.upper():
+                            wait_seconds = 30
+                            parts = err_text.split("_")
+                            if len(parts) >= 3 and parts[-1].isdigit():
+                                wait_seconds = int(parts[-1])
+                            
+                            await self.broadcast("FLOOD_WAIT_WARNING", {
+                                "job_id": task.job_id,
+                                "account_id": task.account_id,
+                                "wait_seconds": wait_seconds
+                            })
 
-                        if wait_seconds > self.max_flood_wait_seconds:
                             if self.flood_wait_action == "ABORT":
                                 task.abort_requested = True
-                                break
                             elif self.flood_wait_action == "PAUSE":
                                 await self.pause_job(task.job_id)
-                                break
-
-                        if self.flood_wait_action == "ABORT":
-                            task.abort_requested = True
-                            break
-                        elif self.flood_wait_action == "PAUSE":
-                            await self.pause_job(task.job_id)
-                            break
+                            else:
+                                await asyncio.sleep(wait_seconds)
                         else:
-                            # AUTO_WAIT: sleep wait_seconds
-                            await asyncio.sleep(wait_seconds)
-                    else:
-                        task.fail_count += 1
+                            task.fail_count += 1
 
-                task.remaining_count = max(0, task.total_targets - (task.success_count + task.fail_count))
+                    processed_count += 1
+                    task.remaining_count = max(0, task.total_targets - (task.success_count + task.fail_count))
 
-                # Record Job Item in DB
-                async with AsyncSessionLocal() as session:
-                    item = JobItem(
-                        job_id=task.job_id,
-                        peer_id=target.peer_id,
-                        peer_type=target.peer_type,
-                        peer_title=target.title,
-                        status="LEFT_SUCCESS" if leave_success else "ERROR",
-                        error_code=error_code,
-                        error_message=error_msg,
-                        processed_at=utc_now()
-                    )
-                    session.add(item)
-                    if leave_success:
-                        # Remove from snapshot
-                        await session.delete(target)
-                    await session.execute(
-                        update(CleaningJob).where(CleaningJob.id == task.job_id).values(
-                            success_count=task.success_count,
-                            fail_count=task.fail_count,
-                            remaining_count=task.remaining_count
+                    # Record Job Item in DB
+                    async with AsyncSessionLocal() as session:
+                        item = JobItem(
+                            job_id=task.job_id,
+                            peer_id=target.peer_id,
+                            peer_type=target.peer_type,
+                            peer_title=target.title,
+                            status="LEFT_SUCCESS" if leave_success else "ERROR",
+                            error_code=error_code,
+                            error_message=error_msg,
+                            processed_at=utc_now()
                         )
-                    )
-                    await session.commit()
+                        session.add(item)
+                        if leave_success:
+                            await session.delete(target)
+                        await session.execute(
+                            update(CleaningJob).where(CleaningJob.id == task.job_id).values(
+                                success_count=task.success_count,
+                                fail_count=task.fail_count,
+                                remaining_count=task.remaining_count
+                            )
+                        )
+                        await session.commit()
 
-                # Broadcast progress via WebSocket
-                progress_pct = round(((index + 1) / max(1, task.total_targets)) * 100, 1)
-                await self.broadcast("JOB_PROGRESS", {
-                    "job_id": task.job_id,
-                    "account_id": task.account_id,
-                    "current_step": index + 1,
-                    "total_steps": task.total_targets,
-                    "percentage": progress_pct,
-                    "current_peer_title": target.title,
-                    "status": "LEFT_SUCCESS" if leave_success else "ERROR",
-                    "success_count": task.success_count,
-                    "fail_count": task.fail_count
-                })
+                    # Broadcast progress via WebSocket
+                    progress_pct = round((processed_count / max(1, task.total_targets)) * 100, 1)
+                    await self.broadcast("JOB_PROGRESS", {
+                        "job_id": task.job_id,
+                        "account_id": task.account_id,
+                        "current_step": processed_count,
+                        "total_steps": task.total_targets,
+                        "percentage": progress_pct,
+                        "current_peer_title": target.title,
+                        "status": "LEFT_SUCCESS" if leave_success else "ERROR",
+                        "success_count": task.success_count,
+                        "fail_count": task.fail_count
+                    })
 
                 # Adaptive Jitter Delay based on system settings
                 delay = random.uniform(min(self.min_delay, self.max_delay), max(self.min_delay, self.max_delay))
                 await asyncio.sleep(delay)
+
+        try:
+            await asyncio.gather(*[process_target(t) for t in targets])
 
             # Final status update
             final_status = "ABORTED" if task.abort_requested else ("COMPLETED" if task.fail_count == 0 else "COMPLETED_WITH_ERRORS")
