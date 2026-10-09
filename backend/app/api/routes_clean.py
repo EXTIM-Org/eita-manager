@@ -164,15 +164,29 @@ async def handle_job_action(job_id: str, req: JobActionRequest):
 @router.get("/active-jobs")
 async def get_active_jobs():
     jobs = []
-    for jid, task in cleaner_engine.active_tasks.items():
+    # Purge any finished or dead tasks from cleaner_engine.active_tasks
+    finished_keys = [
+        jid for jid, task in cleaner_engine.active_tasks.items()
+        if task.state in ["COMPLETED", "COMPLETED_WITH_ERRORS", "FAILED", "ABORTED"]
+    ]
+    for k in finished_keys:
+        cleaner_engine.active_tasks.pop(k, None)
+
+    for jid, task in list(cleaner_engine.active_tasks.items()):
+        total = task.total_targets
+        current = task.success_count + task.fail_count
+        pct = round((current / total) * 100, 1) if total > 0 else 0.0
         jobs.append({
             "job_id": jid,
             "account_id": task.account_id,
             "state": task.state,
-            "total_targets": task.total_targets,
+            "total_targets": total,
+            "total_steps": total,
+            "current_step": current,
             "success_count": task.success_count,
             "fail_count": task.fail_count,
-            "remaining_count": task.remaining_count
+            "remaining_count": task.remaining_count,
+            "percentage": pct
         })
     return {
         "success": True,

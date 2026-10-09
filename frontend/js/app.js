@@ -46,6 +46,7 @@ const elements = {
   statNeedsReauth: document.getElementById('statNeedsReauth'),
   statTotalCleaned: document.getElementById('statTotalCleaned'),
   statActivePct: document.getElementById('statActivePct'),
+  statCleanSuccessRate: document.getElementById('statCleanSuccessRate'),
   accCountBadge: document.getElementById('accCountBadge'),
   dashActiveJobsContainer: document.getElementById('dashActiveJobsContainer'),
   dashRecentJobsContainer: document.getElementById('dashRecentJobsContainer'),
@@ -323,21 +324,71 @@ function initWebSocket() {
   };
 }
 
+function getJobProgress(j) {
+  const total = j.total_steps || j.total_targets || 0;
+  const current = j.current_step !== undefined ? j.current_step : ((j.success_count || 0) + (j.fail_count || 0));
+  let pct = 0;
+  if (j.percentage !== undefined && j.percentage !== null) {
+    pct = Math.round(j.percentage);
+  } else if (total > 0) {
+    pct = Math.min(100, Math.round((current / total) * 100));
+  } else if (['COMPLETED', 'COMPLETED_WITH_ERRORS'].includes(j.state)) {
+    pct = 100;
+  }
+  return { total, current, pct };
+}
+
 function handleWebSocketEvent(event, payload) {
-  if (event === 'JOB_PROGRESS') {
-    state.activeJobs[payload.job_id] = payload;
+  if (event === 'JOB_QUEUED') {
+    state.activeJobs[payload.job_id] = {
+      job_id: payload.job_id,
+      account_id: payload.account_id,
+      state: 'QUEUED',
+      total_targets: 0,
+      total_steps: 0,
+      current_step: 0,
+      percentage: 0,
+      success_count: 0,
+      fail_count: 0
+    };
     renderActiveJobs();
     updateDashboardActiveJobs();
-  } else if (event === 'JOB_COMPLETED') {
+    fetchStats();
+    fetchAccounts();
+  } else if (event === 'JOB_PROGRESS') {
+    state.activeJobs[payload.job_id] = {
+      ...(state.activeJobs[payload.job_id] || {}),
+      ...payload,
+      state: payload.state || 'RUNNING'
+    };
+    renderActiveJobs();
+    updateDashboardActiveJobs();
+  } else if (event === 'JOB_PAUSED') {
+    if (state.activeJobs[payload.job_id]) {
+      state.activeJobs[payload.job_id].state = 'PAUSED';
+    }
+    renderActiveJobs();
+    updateDashboardActiveJobs();
+  } else if (event === 'JOB_RESUMED') {
+    if (state.activeJobs[payload.job_id]) {
+      state.activeJobs[payload.job_id].state = 'RUNNING';
+    }
+    renderActiveJobs();
+    updateDashboardActiveJobs();
+  } else if (event === 'JOB_ABORTED' || event === 'JOB_COMPLETED') {
     delete state.activeJobs[payload.job_id];
-    showToast(`عملیات پاکسازی با موفقیت انجام شد (${payload.success_count} مورد ترک شد)`, 'success');
+    if (event === 'JOB_COMPLETED') {
+      showToast(`عملیات پاکسازی با موفقیت انجام شد (${toPersianDigits(payload.success_count || 0)} مورد ترک شد)`, 'success');
+    } else {
+      showToast('عملیات پاکسازی لغو شد', 'warning');
+    }
     renderActiveJobs();
     updateDashboardActiveJobs();
     fetchStats();
     fetchAccounts();
     fetchReports();
   } else if (event === 'FLOOD_WAIT_WARNING') {
-    showToast(`محدودیت زمانی ایتا (FloodWait): ${payload.wait_seconds} ثانیه توقف خودکار`, 'warning');
+    showToast(`محدودیت زمانی ایتا (FloodWait): ${toPersianDigits(payload.wait_seconds)} ثانیه توقف خودکار`, 'warning');
   }
 }
 
@@ -378,9 +429,11 @@ async function fetchActiveJobs() {
     const res = await fetch('/api/v1/clean/active-jobs');
     const json = await res.json();
     if (json.success) {
+      const newActiveJobs = {};
       json.data.forEach(j => {
-        state.activeJobs[j.job_id] = j;
+        newActiveJobs[j.job_id] = j;
       });
+      state.activeJobs = newActiveJobs;
       renderActiveJobs();
       updateDashboardActiveJobs();
     }
@@ -531,19 +584,50 @@ function renderStats() {
   if (d.total_accounts > 0) {
     const pct = Math.round((d.active_accounts / d.total_accounts) * 100);
     elements.statActivePct.innerText = `${toPersianDigits(pct)}٪ فعال`;
+  } else {
+    elements.statActivePct.innerText = '۱۰۰٪ آماده به کار';
+  }
+
+  // Update success rate on card 4
+  if (elements.statCleanSuccessRate) {
+    if (d.total_cleaned_items > 0 || d.total_failed_items > 0) {
+      elements.statCleanSuccessRate.innerText = `${toPersianDigits(Math.round(d.success_rate_pct || 100))}٪ موفقیت پاکسازی`;
+    } else {
+      elements.statCleanSuccessRate.innerText = '۱۰۰٪ موفقیت پاکسازی';
+    }
   }
 
   // Render recent history on dashboard
   if (d.recent_history && d.recent_history.length > 0) {
-    elements.dashRecentJobsContainer.innerHTML = d.recent_history.map(j => `
-      <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
-        <div>
-          <strong style="color:var(--primary);">${j.id}</strong>
-          <span style="font-size:0.8rem; color:var(--text-muted); display:block;">تعداد: ${toPersianDigits(j.success_count)} موفق / ${toPersianDigits(j.fail_count)} خطا</span>
+    elements.dashRecentJobsContainer.innerHTML = d.recent_history.map(j => {
+      const isDone = j.status === 'COMPLETED';
+      const isErrors = j.status === 'COMPLETED_WITH_ERRORS';
+      const badgeClass = isDone ? 'connected' : (isErrors ? 'busy' : 'needs_reauth');
+      const badgeText = isDone ? '✅ تکمیل شده' : (isErrors ? '⚠️ تکمیل با خطا' : j.status);
+      const pct = j.percentage !== undefined ? Math.round(j.percentage) : 100;
+
+      return `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:rgba(255,255,255,0.02); border-radius:10px; margin-bottom:8px; border:1px solid rgba(255,255,255,0.05);">
+          <div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <strong style="color:var(--primary); font-family:monospace;">${j.id}</strong>
+              <span class="badge blue" style="font-size:0.75rem;">ACC-${j.account_id}</span>
+            </div>
+            <span style="font-size:0.8rem; color:var(--text-muted); display:block; margin-top:4px;">
+              ${toPersianDigits(j.success_count)} موفق / ${toPersianDigits(j.fail_count)} خطا • پیشرفت: <strong style="color:var(--text-main);">${toPersianDigits(pct)}٪</strong>
+            </span>
+          </div>
+          <span class="status-badge ${badgeClass}">${badgeText}</span>
         </div>
-        <span class="status-badge ${j.status === 'COMPLETED' ? 'connected' : 'needs_reauth'}">${j.status === 'COMPLETED' ? 'تکمیل شده' : j.status}</span>
+      `;
+    }).join('');
+  } else {
+    elements.dashRecentJobsContainer.innerHTML = `
+      <div class="empty-state">
+        <span class="empty-icon">📋</span>
+        <p>سابقه‌ای از پاکسازی ثبت نشده است.</p>
       </div>
-    `).join('');
+    `;
   }
 }
 
@@ -609,7 +693,9 @@ function updateBulkActionButtons() {
 }
 
 function renderActiveJobs() {
-  const jobs = Object.values(state.activeJobs);
+  const jobs = Object.values(state.activeJobs).filter(j => 
+    !['COMPLETED', 'COMPLETED_WITH_ERRORS', 'FAILED', 'ABORTED'].includes(j.state)
+  );
   const count = jobs.length;
   if (count > 0) {
     elements.activeJobsBadge.style.display = 'inline-block';
@@ -630,7 +716,7 @@ function renderActiveJobs() {
   }
 
   elements.activeJobsList.innerHTML = jobs.map(j => {
-    const pct = j.percentage || (j.total_steps ? Math.round((j.current_step / j.total_steps) * 100) : 0);
+    const prog = getJobProgress(j);
     return `
       <div class="job-card glass-card" id="card-${j.job_id}">
         <div class="job-card-header">
@@ -641,11 +727,11 @@ function renderActiveJobs() {
           <span class="tag-live">${j.state || 'در حال اجرا'}</span>
         </div>
         <div class="progress-bar-container">
-          <div class="progress-bar-fill" style="width: ${pct}%"></div>
+          <div class="progress-bar-fill" style="width: ${prog.pct}%"></div>
         </div>
         <div class="job-card-footer">
           <span style="font-size:0.85rem; color:var(--text-muted);">
-            پیشرفت: ${toPersianDigits(pct)}٪ (${toPersianDigits(j.current_step || 0)} از ${toPersianDigits(j.total_steps || j.total_targets || 0)})
+            پیشرفت: ${toPersianDigits(prog.pct)}٪ (${toPersianDigits(prog.current)} از ${toPersianDigits(prog.total)})
             ${j.current_peer_title ? ` • در حال خروج از: <strong>${j.current_peer_title}</strong>` : ''}
           </span>
           <div class="job-controls">
@@ -660,7 +746,9 @@ function renderActiveJobs() {
 }
 
 function updateDashboardActiveJobs() {
-  const jobs = Object.values(state.activeJobs);
+  const jobs = Object.values(state.activeJobs).filter(j => 
+    !['COMPLETED', 'COMPLETED_WITH_ERRORS', 'FAILED', 'ABORTED'].includes(j.state)
+  );
   if (jobs.length === 0) {
     elements.dashActiveJobsContainer.innerHTML = `
       <div class="empty-state">
@@ -671,17 +759,20 @@ function updateDashboardActiveJobs() {
     return;
   }
 
-  elements.dashActiveJobsContainer.innerHTML = jobs.map(j => `
+  elements.dashActiveJobsContainer.innerHTML = jobs.map(j => {
+    const prog = getJobProgress(j);
+    return `
     <div style="padding:12px; background:rgba(255,255,255,0.03); border-radius:10px; margin-bottom:8px;">
       <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
         <span>تسک ${j.job_id}</span>
-        <strong style="color:var(--primary);">${toPersianDigits(j.percentage || 0)}٪</strong>
+        <strong style="color:var(--primary);">${toPersianDigits(prog.pct)}٪</strong>
       </div>
       <div class="progress-bar-container" style="margin-bottom:0; height:6px;">
-        <div class="progress-bar-fill" style="width: ${j.percentage || 0}%"></div>
+        <div class="progress-bar-fill" style="width: ${prog.pct}%"></div>
       </div>
     </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 // Bulk Inspect Logic (بررسی و اسکن گروهی حساب‌ها)
