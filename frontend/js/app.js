@@ -89,6 +89,7 @@ const elements = {
   reportFilterPills: document.querySelectorAll('#reportFilterPills .filter-pill'),
   btnRefreshReports: document.getElementById('btnRefreshReports'),
   btnClearReports: document.getElementById('btnClearReports'),
+  btnTestReportDetails: document.getElementById('btnTestReportDetails'),
   reportsCountBadge: document.getElementById('reportsCountBadge'),
 
   // Job Details Modal Elements
@@ -96,12 +97,16 @@ const elements = {
   btnCloseJobDetailsModal: document.getElementById('btnCloseJobDetailsModal'),
   btnCloseJobDetailsBtn: document.getElementById('btnCloseJobDetailsBtn'),
   jobDetailsTitle: document.getElementById('jobDetailsTitle'),
+  jdHeaderBadge: document.getElementById('jdHeaderBadge'),
   jdJobId: document.getElementById('jdJobId'),
   jdSuccessCount: document.getElementById('jdSuccessCount'),
   jdFailCount: document.getElementById('jdFailCount'),
   jdStatus: document.getElementById('jdStatus'),
   jobFailureSummaryBox: document.getElementById('jobFailureSummaryBox'),
   jobItemsTableBody: document.getElementById('jobItemsTableBody'),
+  modalJobSearchInput: document.getElementById('modalJobSearchInput'),
+  modalJobFilterPills: document.querySelectorAll('#modalJobFilterPills .filter-pill'),
+  jdItemsCountLabel: document.getElementById('jdItemsCountLabel'),
 
   // Dialogs Modal Elements
   modalDialogs: document.getElementById('modalDialogs'),
@@ -926,18 +931,136 @@ function renderDialogsTable(items) {
   }).join('');
 }
 
+// Modal Job Details State
+let currentJobModalItems = [];
+let currentJobModalFilter = 'all';
+let currentJobModalSearch = '';
+
+function renderJobModalTable() {
+  if (!elements.jobItemsTableBody) return;
+
+  const query = (currentJobModalSearch || '').trim().toLowerCase();
+  const filter = currentJobModalFilter || 'all';
+
+  const filtered = currentJobModalItems.filter(it => {
+    // Status filter
+    if (filter === 'success' && it.status !== 'LEFT_SUCCESS') return false;
+    if (filter === 'failed' && it.status === 'LEFT_SUCCESS') return false;
+
+    // Search query
+    if (query) {
+      const title = (it.peer_title || '').toLowerCase();
+      const pid = String(it.peer_id || '').toLowerCase();
+      const err = (it.error_message || it.error_code || '').toLowerCase();
+      if (!title.includes(query) && !pid.includes(query) && !err.includes(query)) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  if (elements.jdItemsCountLabel) {
+    elements.jdItemsCountLabel.innerText = `نمایش ${toPersianDigits(filtered.length)} از ${toPersianDigits(currentJobModalItems.length)} ردیف`;
+  }
+
+  if (filtered.length === 0) {
+    elements.jobItemsTableBody.innerHTML = `
+      <tr>
+        <td colspan="6" class="empty-state" style="padding: 28px;">
+          <p style="margin:0; color:var(--text-muted);">موردی با این جستجو یا فیلتر یافت نشد.</p>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  elements.jobItemsTableBody.innerHTML = filtered.map(it => {
+    const isSuccess = it.status === 'LEFT_SUCCESS';
+    const typeLabel = (it.peer_type === 'channel' || it.peer_type === 'supergroup') ? 'کانال' : 'گروه';
+    const statusBadge = isSuccess 
+      ? '<span class="status-badge connected">✅ ترک شد</span>'
+      : '<span class="status-badge needs_reauth">❌ خطا</span>';
+
+    const timeStr = it.processed_at ? new Date(it.processed_at).toLocaleTimeString('fa-IR', {
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    }) : '-';
+
+    return `
+      <tr>
+        <td><strong>${it.peer_title || 'بدون نام'}</strong></td>
+        <td><span class="badge blue" style="font-size:0.75rem;">${typeLabel}</span></td>
+        <td dir="ltr" style="font-family:monospace; font-size:0.8rem; color:var(--text-muted);">${it.peer_id}</td>
+        <td>${statusBadge}</td>
+        <td style="font-size:0.8rem; color:${isSuccess ? 'var(--text-muted)' : '#f87171'}; font-weight:${isSuccess ? 'normal' : '500'};">
+          ${it.error_message || (isSuccess ? '-' : (it.error_code || 'خطای سرور'))}
+        </td>
+        <td><span style="font-size:0.8rem; color:var(--text-muted);">${timeStr}</span></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function openMockJobDetails() {
+  if (!elements.modalJobDetails) return;
+  elements.modalJobDetails.style.display = 'flex';
+  elements.jdJobId.innerText = 'job_sample_demo_802';
+  if (elements.jdHeaderBadge) elements.jdHeaderBadge.innerText = 'حساب 09123456789 (نمونه تستی)';
+  elements.jdSuccessCount.innerText = toPersianDigits(11);
+  elements.jdFailCount.innerText = toPersianDigits(4);
+  elements.jdStatus.innerText = 'تکمیل‌شده با خطا';
+  if (elements.jobFailureSummaryBox) {
+    elements.jobFailureSummaryBox.style.display = 'block';
+    elements.jobFailureSummaryBox.innerHTML = '<strong>توجه:</strong> ۴ مورد از چت‌ها به دلیل محدودیت موقت اسپم یا محافظت سازنده از حساب خارج نشدند.';
+  }
+
+  currentJobModalFilter = 'all';
+  currentJobModalSearch = '';
+  if (elements.modalJobSearchInput) elements.modalJobSearchInput.value = '';
+  if (elements.modalJobFilterPills) {
+    elements.modalJobFilterPills.forEach(p => p.classList.toggle('active', p.getAttribute('data-job-filter') === 'all'));
+  }
+
+  currentJobModalItems = [
+    { peer_title: "کانال اخبار فوری و فناوری", peer_type: "channel", peer_id: "-1001428591024", status: "LEFT_SUCCESS", error_message: null, processed_at: new Date(Date.now() - 100000).toISOString() },
+    { peer_title: "فروشگاه آنلاین پوشاک و مد", peer_type: "channel", peer_id: "-1001692847120", status: "LEFT_SUCCESS", error_message: null, processed_at: new Date(Date.now() - 95000).toISOString() },
+    { peer_title: "گروه توسعه‌دهندگان پایتون و لینوکس", peer_type: "group", peer_id: "-1001552391002", status: "LEFT_SUCCESS", error_message: null, processed_at: new Date(Date.now() - 90000).toISOString() },
+    { peer_title: "کانال تخفیف‌های ویژه روزانه", peer_type: "channel", peer_id: "-1001883920194", status: "LEFT_SUCCESS", error_message: null, processed_at: new Date(Date.now() - 85000).toISOString() },
+    { peer_title: "کانال نیازمندی‌های استخدامی", peer_type: "channel", peer_id: "-1001772948201", status: "FAILED", error_code: "FLOOD_WAIT_15", error_message: "محدودیت موقت اسپم سرور ایتا (FloodWait)", processed_at: new Date(Date.now() - 80000).toISOString() },
+    { peer_title: "کانال رسمی شرکت (تحت مالکیت)", peer_type: "channel", peer_id: "-1001992019284", status: "FAILED", error_code: "CREATOR_PROTECTED", error_message: "محافظت شده (مالک و سازنده چت)", processed_at: new Date(Date.now() - 75000).toISOString() },
+    { peer_title: "اطلاع‌رسانی دانشگاه و آموزش عالی", peer_type: "channel", peer_id: "-1001229384756", status: "LEFT_SUCCESS", error_message: null, processed_at: new Date(Date.now() - 70000).toISOString() },
+    { peer_title: "کانال هوش مصنوعی و داده کاوی", peer_type: "channel", peer_id: "-1001339485720", status: "LEFT_SUCCESS", error_message: null, processed_at: new Date(Date.now() - 65000).toISOString() },
+    { peer_title: "گروه گفتگو و تبادل تجربیات", peer_type: "group", peer_id: "-1001884729105", status: "LEFT_SUCCESS", error_message: null, processed_at: new Date(Date.now() - 60000).toISOString() },
+    { peer_title: "کانال آشپزی و سلامت خانواده", peer_type: "channel", peer_id: "-1001994827103", status: "LEFT_SUCCESS", error_message: null, processed_at: new Date(Date.now() - 55000).toISOString() },
+    { peer_title: "کانال ویدیوها و کلیپ‌های سرگرمی", peer_type: "channel", peer_id: "-1001557382910", status: "LEFT_SUCCESS", error_message: null, processed_at: new Date(Date.now() - 50000).toISOString() },
+    { peer_title: "کانال شعر و ادبیات معاصر", peer_type: "channel", peer_id: "-1001449281057", status: "LEFT_SUCCESS", error_message: null, processed_at: new Date(Date.now() - 45000).toISOString() },
+    { peer_title: "گروه تست و ارزیابی ربات‌ها", peer_type: "group", peer_id: "-1001662910482", status: "FAILED", error_code: "CHAT_ADMIN_REQUIRED", error_message: "دسترسی ادمین جهت خروج نیاز است", processed_at: new Date(Date.now() - 40000).toISOString() },
+    { peer_title: "کانال بازارچه و تبادلات محلی", peer_type: "channel", peer_id: "-1001773920194", status: "LEFT_SUCCESS", error_message: null, processed_at: new Date(Date.now() - 35000).toISOString() },
+    { peer_title: "کانال آرشیو کتاب و مقالات", peer_type: "channel", peer_id: "-1001882910485", status: "FAILED", error_code: "NETWORK_TIMEOUT", error_message: "عدم پاسخ سرور در زمان مقرر", processed_at: new Date(Date.now() - 30000).toISOString() }
+  ];
+
+  renderJobModalTable();
+  showToast('نمونه آزمایشی پاپ‌آپ با ۱۵ مورد باز شد. اسکرول و فیلتر را بررسی نمایید.', 'info');
+}
+
 function renderReportsTable() {
   if (!elements.reportsTableBody) return;
 
   if (!state.reports || state.reports.length === 0) {
     elements.reportsTableBody.innerHTML = `
       <tr>
-        <td colspan="9" class="empty-state">
+        <td colspan="9" class="empty-state" style="padding: 40px 20px;">
           <span class="empty-icon">📋</span>
           <p>هیچ سابقه یا گزارشی با این فیلتر یافت نشد.</p>
+          <button class="btn btn-primary btn-sm" id="btnTestReportDetailsEmpty" style="margin-top:14px;">
+            🧪 مشاهده نمونه گزارش آزمایشی (جهت تست پاپ‌آپ)
+          </button>
         </td>
       </tr>
     `;
+    const btnEmpty = document.getElementById('btnTestReportDetailsEmpty');
+    if (btnEmpty) {
+      btnEmpty.addEventListener('click', openMockJobDetails);
+    }
     return;
   }
 
@@ -989,10 +1112,18 @@ async function viewJobDetails(jobId) {
   if (!elements.modalJobDetails) return;
   elements.modalJobDetails.style.display = 'flex';
   elements.jobItemsTableBody.innerHTML = `
-    <tr><td colspan="6" class="text-center">در حال بارگذاری لاگ‌های این تسک...</td></tr>
+    <tr><td colspan="6" class="text-center" style="padding:30px;">در حال بارگذاری لاگ‌های این تسک...</td></tr>
   `;
   elements.jdJobId.innerText = jobId;
+  if (elements.jdHeaderBadge) elements.jdHeaderBadge.innerText = jobId;
   elements.jobFailureSummaryBox.style.display = 'none';
+
+  currentJobModalFilter = 'all';
+  currentJobModalSearch = '';
+  if (elements.modalJobSearchInput) elements.modalJobSearchInput.value = '';
+  if (elements.modalJobFilterPills) {
+    elements.modalJobFilterPills.forEach(p => p.classList.toggle('active', p.getAttribute('data-job-filter') === 'all'));
+  }
 
   try {
     const res = await fetch(`/api/v1/reports/${jobId}/items`);
@@ -1005,40 +1136,11 @@ async function viewJobDetails(jobId) {
 
       if (d.failure_summary) {
         elements.jobFailureSummaryBox.style.display = 'block';
-        elements.jobFailureSummaryBox.innerText = `علت خطا: ${d.failure_summary}`;
+        elements.jobFailureSummaryBox.innerText = `علت کلی خطا: ${d.failure_summary}`;
       }
 
-      if (!d.items || d.items.length === 0) {
-        elements.jobItemsTableBody.innerHTML = `
-          <tr><td colspan="6" class="empty-state"><p>هیچ ردیف لاگی برای این تسک ثبت نشده است.</p></td></tr>
-        `;
-        return;
-      }
-
-      elements.jobItemsTableBody.innerHTML = d.items.map(it => {
-        const isSuccess = it.status === 'LEFT_SUCCESS';
-        const typeLabel = (it.peer_type === 'channel' || it.peer_type === 'supergroup') ? 'کانال' : 'گروه';
-        const statusBadge = isSuccess 
-          ? '<span class="status-badge connected">✅ ترک شد</span>'
-          : '<span class="status-badge needs_reauth">❌ خطا</span>';
-
-        const timeStr = it.processed_at ? new Date(it.processed_at).toLocaleTimeString('fa-IR', {
-          hour: '2-digit', minute: '2-digit', second: '2-digit'
-        }) : '-';
-
-        return `
-          <tr>
-            <td><strong>${it.peer_title || 'بدون نام'}</strong></td>
-            <td>${typeLabel}</td>
-            <td dir="ltr" style="font-family:monospace; font-size:0.8rem;">${it.peer_id}</td>
-            <td>${statusBadge}</td>
-            <td style="font-size:0.8rem; color:${isSuccess ? 'var(--text-muted)' : '#f87171'};">
-              ${it.error_message || (isSuccess ? '-' : (it.error_code || 'خطای سرور'))}
-            </td>
-            <td><span style="font-size:0.8rem;">${timeStr}</span></td>
-          </tr>
-        `;
-      }).join('');
+      currentJobModalItems = d.items || [];
+      renderJobModalTable();
     } else {
       showToast('خطا در دریافت جزئیات تسک', 'error');
     }
@@ -1597,6 +1699,32 @@ function setupEventListeners() {
     });
   }
 
+  // Test Report Details Button
+  if (elements.btnTestReportDetails) {
+    elements.btnTestReportDetails.addEventListener('click', () => {
+      openMockJobDetails();
+    });
+  }
+
+  // Job Details Modal Search & Filter
+  if (elements.modalJobSearchInput) {
+    elements.modalJobSearchInput.addEventListener('input', (e) => {
+      currentJobModalSearch = e.target.value;
+      renderJobModalTable();
+    });
+  }
+
+  if (elements.modalJobFilterPills) {
+    elements.modalJobFilterPills.forEach(pill => {
+      pill.addEventListener('click', () => {
+        elements.modalJobFilterPills.forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        currentJobModalFilter = pill.getAttribute('data-job-filter') || 'all';
+        renderJobModalTable();
+      });
+    });
+  }
+
   // Close Job Details Modal
   if (elements.btnCloseJobDetailsModal) {
     elements.btnCloseJobDetailsModal.addEventListener('click', () => {
@@ -1608,6 +1736,31 @@ function setupEventListeners() {
       elements.modalJobDetails.style.display = 'none';
     });
   }
+  if (elements.modalJobDetails) {
+    elements.modalJobDetails.addEventListener('click', (e) => {
+      if (e.target === elements.modalJobDetails) {
+        elements.modalJobDetails.style.display = 'none';
+      }
+    });
+  }
+
+  // Global ESC key to close active modals
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (elements.modalJobDetails && elements.modalJobDetails.style.display !== 'none') {
+        elements.modalJobDetails.style.display = 'none';
+      }
+      if (elements.modalAddAccount && elements.modalAddAccount.style.display !== 'none') {
+        elements.modalAddAccount.style.display = 'none';
+      }
+      if (elements.modalBulkInspect && elements.modalBulkInspect.style.display !== 'none') {
+        elements.modalBulkInspect.style.display = 'none';
+      }
+      if (elements.modalDialogs && elements.modalDialogs.style.display !== 'none') {
+        elements.modalDialogs.style.display = 'none';
+      }
+    }
+  });
 
   // Settings Controls & Listeners
   if (elements.inputMaxConcurrency) {

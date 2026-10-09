@@ -597,13 +597,25 @@ body {
 .modal {
   width: 100%;
   max-width: 480px;
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
   border-radius: 20px;
   overflow: hidden;
   animation: modalPop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 35px rgba(0, 210, 255, 0.08);
 }
 
 .modal-lg {
-  max-width: 760px;
+  max-width: 860px;
+  width: 95%;
+}
+
+.modal-job-details-dialog {
+  max-width: 920px;
+  width: 95%;
+  height: 85vh;
+  max-height: 750px;
 }
 
 /* Custom Confirmation / Alert Dialog */
@@ -690,11 +702,13 @@ body {
 }
 
 .modal-header {
-  padding: 20px 24px;
+  flex-shrink: 0;
+  padding: 18px 24px;
   border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background: rgba(15, 23, 42, 0.65);
 }
 
 .modal-header h3 {
@@ -708,10 +722,58 @@ body {
   color: var(--text-muted);
   font-size: 1.5rem;
   cursor: pointer;
+  transition: var(--transition);
+  line-height: 1;
+}
+
+.modal-close:hover {
+  color: #fff;
+  transform: scale(1.1);
 }
 
 .modal-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
   padding: 24px;
+}
+
+.modal-footer {
+  flex-shrink: 0;
+  padding: 14px 24px;
+  border-top: 1px solid var(--border-color);
+  background: rgba(10, 14, 23, 0.7);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.modal-table-filter-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.dialogs-table-wrapper {
+  flex: 1 1 auto;
+  max-height: 420px;
+  overflow-y: auto;
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: rgba(10, 14, 23, 0.45);
+}
+
+.dialogs-table-wrapper thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #111827;
+  box-shadow: 0 1px 0 var(--border-color);
 }
 
 .modal-desc {
