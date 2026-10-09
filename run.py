@@ -29,13 +29,17 @@ def main():
     except Exception:
         pass
 
+    host = os.getenv("HOST", "127.0.0.1")
+    port = int(os.getenv("PORT", "8000"))
+    reload = os.getenv("RELOAD", "false").lower() in ("true", "1")
+
     # Start FastAPI server via Uvicorn
     uvicorn.run(
         "app.main:app",
-        host="127.0.0.1",
-        port=8000,
-        reload=True,
-        reload_dirs=[str(BACKEND_DIR)],
+        host=host,
+        port=port,
+        reload=reload,
+        reload_dirs=[str(BACKEND_DIR)] if reload else None,
         log_level="info"
     )
 
