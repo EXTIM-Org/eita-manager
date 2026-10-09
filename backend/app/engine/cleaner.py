@@ -35,6 +35,7 @@ class CleaningEngine:
         self.active_tasks: Dict[str, CleaningTask] = {}
         self.task_queue: asyncio.Queue = asyncio.Queue()
         cfg = load_settings()
+        self.max_concurrency = int(cfg.get("max_concurrency", 5))
         # Standard balanced anti-flood settings (hardcoded)
         self.min_delay = 1.0
         self.max_delay = 2.5
