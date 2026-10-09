@@ -235,3 +235,98 @@ def extract_chats_and_channels(data: bytes) -> List[Dict[str, Any]]:
                 continue
 
     return results
+
+
+def extract_dialogs_pagination_offset(raw_data: bytes, chat_map: Optional[Dict[str, Any]] = None) -> Optional[Tuple[int, int, bytes]]:
+    """
+    Parses a messages.dialogsSlice TL payload and calculates the pagination
+    offsets (offset_date, offset_id, offset_peer bytes) needed to request the next slice.
+    Returns None if there are no more slices or if offsets cannot be determined.
+    """
+    raw = decompress_if_needed(raw_data)
+    if len(raw) < 16:
+        return None
+
+    try:
+        buf = TLBuffer(raw)
+        cid = buf.read_uint()
+        if cid != 0x71e094f3: # Not messages.dialogsSlice (e.g. messages.dialogs complete)
+            return None
+        
+        total_count = buf.read_int()
+        vec_id = buf.read_uint()
+        d_count = buf.read_int()
+        if d_count == 0:
+            return None
+
+        dialogs = []
+        for _ in range(d_count):
+            d_cid = buf.read_uint()
+            flags = buf.read_uint()
+            peer_cid = buf.read_uint()
+            peer_id = buf.read_long()
+            top_message = buf.read_int()
+            read_inbox_max_id = buf.read_int()
+            read_outbox_max_id = buf.read_int()
+            unread_count = buf.read_int()
+            unread_mentions = buf.read_int()
+            if flags & (1 << 3): # unread_reactions
+                _ = buf.read_int()
+            _ = buf.read_uint() # notify_cid
+            _ = buf.read_uint() # notify_flags
+            if flags & (1 << 0): # pts
+                _ = buf.read_int()
+            if flags & (1 << 1): # draft
+                _ = buf.read_uint()
+            if flags & (1 << 4): # folder_id
+                _ = buf.read_int()
+
+            dialogs.append({
+                "peer_cid": peer_cid,
+                "peer_id": peer_id,
+                "top_message": top_message
+            })
+
+        msg_vec_start = buf.offset
+
+        # Scan dialogs in reverse to find a dialog with top_message and valid date in messages vector
+        for d in reversed(dialogs):
+            top_msg = d["top_message"]
+            if top_msg <= 0:
+                continue
+
+            needle = struct.pack("<i", top_msg)
+            idx = raw.find(needle, msg_vec_start)
+            if idx == -1:
+                continue
+
+            found_date = None
+            for off in range(max(msg_vec_start, idx - 16), min(len(raw) - 4, idx + 48), 4):
+                val = struct.unpack_from("<I", raw, off)[0]
+                if 1600000000 < val < 2100000000:
+                    found_date = val
+                    break
+
+            if found_date:
+                peer_cid = d["peer_cid"]
+                peer_id = d["peer_id"]
+                acc_hash = 0
+                if chat_map and str(peer_id) in chat_map:
+                    acc_hash = chat_map[str(peer_id)].get("access_hash", 0)
+
+                if peer_cid == 0xa2a5371e: # peerChannel
+                    input_peer = struct.pack("<I", 0x20adaef8) + struct.pack("<q", peer_id) + struct.pack("<q", acc_hash)
+                elif peer_cid == 0x36c60888: # peerChat
+                    input_peer = struct.pack("<I", 0x3960e6f0) + struct.pack("<q", peer_id)
+                elif peer_cid == 0x59511761: # peerUser
+                    input_peer = struct.pack("<I", 0x7b8e7de6) + struct.pack("<q", peer_id) + struct.pack("<q", acc_hash)
+                else:
+                    input_peer = struct.pack("<I", 0x7f3b18ea) # inputPeerEmpty
+
+                return (found_date, top_msg, input_peer)
+
+    except Exception:
+        return None
+
+    return None
+

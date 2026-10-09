@@ -24,7 +24,7 @@ from app.eitaa.protocol import (
     tl_bytes,
     TLReader
 )
-from app.eitaa.tl_engine import extract_auth_token, extract_chats_and_channels
+from app.eitaa.tl_engine import extract_auth_token, extract_chats_and_channels, extract_dialogs_pagination_offset
 
 class EitaaClient:
     def __init__(self, token: str = "", imei: str = "", account_id: Optional[int] = None):
@@ -161,29 +161,61 @@ class EitaaClient:
             }
         }
 
-    async def get_dialogs(self, limit: int = 500) -> Dict[str, Any]:
+    async def get_dialogs(self, limit: int = 1000, max_pages: int = 50) -> Dict[str, Any]:
         """
         Fetches dialogs (channels and groups) for this session from Eitaa.
+        Automatically handles MTProto pagination across all slices.
         """
-        query = (
-            tl_uint(0xa0f4cb4f) # messages.getDialogs
-            + tl_int(0)         # flags
-            + tl_int(0)         # offset_date
-            + tl_int(0)         # offset_id
-            + tl_uint(0x7f3b18ea) # inputPeerEmpty (0x7f3b18ea)
-            + tl_int(limit)
-            + tl_uint(0) + tl_uint(0) # hash: long (0)
-        )
-        result = await self.invoke(query)
-        if result.get("type") == "rpc_error":
-            return {
-                "success": False,
-                "error": result.get("error_message"),
-                "error_code": result.get("error_code")
-            }
+        all_chats: Dict[str, Dict[str, Any]] = {}
+        offset_date = 0
+        offset_id = 0
+        offset_peer = tl_uint(0x7f3b18ea) # inputPeerEmpty (0x7f3b18ea)
 
-        # Extract all channels and groups from raw payload
-        chats = extract_chats_and_channels(result.get("raw_bytes", b""))
+        for _ in range(max_pages):
+            query = (
+                tl_uint(0xa0f4cb4f) # messages.getDialogs
+                + tl_int(0)         # flags
+                + tl_int(offset_date)
+                + tl_int(offset_id)
+                + offset_peer
+                + tl_int(100)
+                + tl_uint(0) + tl_uint(0) # hash: long (0)
+            )
+            result = await self.invoke(query)
+            if result.get("type") == "rpc_error":
+                if not all_chats:
+                    return {
+                        "success": False,
+                        "error": result.get("error_message"),
+                        "error_code": result.get("error_code")
+                    }
+                break
+
+            raw = result.get("raw_bytes", b"")
+            new_chats = extract_chats_and_channels(raw)
+            if not new_chats:
+                break
+
+            added_count = 0
+            for c in new_chats:
+                if c["peer_id"] not in all_chats:
+                    all_chats[c["peer_id"]] = c
+                    added_count += 1
+
+            if added_count == 0:
+                break
+
+            if limit and len(all_chats) >= limit:
+                break
+
+            offsets = extract_dialogs_pagination_offset(raw, chat_map=all_chats)
+            if not offsets:
+                break
+
+            offset_date, offset_id, offset_peer = offsets
+            await asyncio.sleep(0.1)
+
+        chats = list(all_chats.values())
         channels = [c for c in chats if c["type"] in ("channel", "supergroup")]
         groups = [c for c in chats if c["type"] == "basic_group"]
 
