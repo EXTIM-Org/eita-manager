@@ -614,8 +614,45 @@ body {
 .modal-job-details-dialog {
   max-width: 920px;
   width: 95%;
-  height: 85vh;
-  max-height: 750px;
+  height: min(85vh, 720px);
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-job-details-dialog .modal-header {
+  flex-shrink: 0;
+}
+
+.modal-job-details-dialog .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden !important; /* Prevents modal body from ever generating a second scrollbar */
+  padding: 18px 24px 14px;
+}
+
+.modal-job-details-dialog .dialogs-summary-bar,
+.modal-job-details-dialog #jobFailureSummaryBox,
+.modal-job-details-dialog .modal-table-filter-bar {
+  flex-shrink: 0;
+}
+
+.modal-job-details-dialog .dialogs-table-wrapper {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto !important; /* Only this internal list has a scrollbar */
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: rgba(10, 14, 23, 0.45);
+}
+
+.modal-job-details-dialog .modal-footer {
+  flex-shrink: 0;
 }
 
 /* Custom Confirmation / Alert Dialog */
@@ -766,6 +803,26 @@ body {
   border-radius: 12px;
   border: 1px solid var(--border-color);
   background: rgba(10, 14, 23, 0.45);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 210, 255, 0.35) rgba(10, 14, 23, 0.3);
+}
+
+.dialogs-table-wrapper::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.dialogs-table-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(0, 210, 255, 0.35);
+  border-radius: 4px;
+}
+
+.dialogs-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 210, 255, 0.6);
+}
+
+.dialogs-table-wrapper::-webkit-scrollbar-track {
+  background: rgba(10, 14, 23, 0.3);
 }
 
 .dialogs-table-wrapper thead th {
