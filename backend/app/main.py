@@ -58,10 +58,10 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             # Keep socket alive and listen for client messages
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        ws_manager.disconnect(websocket)
-    except Exception:
+            msg = await websocket.receive_text()
+            if msg == "ping":
+                await websocket.send_text(json.dumps({"event": "PONG", "payload": {}}))
+    except (WebSocketDisconnect, Exception):
         ws_manager.disconnect(websocket)
 
 # Mount Frontend Static Files

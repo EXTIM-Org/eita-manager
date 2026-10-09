@@ -515,18 +515,20 @@ class CleaningEngine:
                         await session.commit()
 
                     # Broadcast progress via WebSocket
-                    progress_pct = round((processed_count / max(1, task.total_targets)) * 100, 1)
-                    await self.broadcast("JOB_PROGRESS", {
-                        "job_id": task.job_id,
-                        "account_id": task.account_id,
-                        "current_step": processed_count,
-                        "total_steps": task.total_targets,
-                        "percentage": progress_pct,
-                        "current_peer_title": target.title,
-                        "status": "LEFT_SUCCESS" if leave_success else "ERROR",
-                        "success_count": task.success_count,
-                        "fail_count": task.fail_count
-                    })
+                    if not task.abort_requested:
+                        progress_pct = round((processed_count / max(1, task.total_targets)) * 100, 1)
+                        await self.broadcast("JOB_PROGRESS", {
+                            "job_id": task.job_id,
+                            "account_id": task.account_id,
+                            "state": task.state,
+                            "current_step": processed_count,
+                            "total_steps": task.total_targets,
+                            "percentage": progress_pct,
+                            "current_peer_title": target.title,
+                            "status": "LEFT_SUCCESS" if leave_success else "ERROR",
+                            "success_count": task.success_count,
+                            "fail_count": task.fail_count
+                        })
 
                 # Balanced & Standard mode delay: 1.0s to 2.5s jitter per leave
                 delay = random.uniform(1.0, 2.5)
@@ -564,14 +566,20 @@ class CleaningEngine:
                 )
                 await session.commit()
 
-            await self.broadcast("JOB_COMPLETED", {
-                "job_id": task.job_id,
-                "account_id": task.account_id,
-                "total_targets": task.total_targets,
-                "success_count": task.success_count,
-                "fail_count": task.fail_count,
-                "status": final_status
-            })
+            if task.abort_requested or final_status == "ABORTED":
+                await self.broadcast("JOB_ABORTED", {
+                    "job_id": task.job_id,
+                    "account_id": task.account_id
+                })
+            else:
+                await self.broadcast("JOB_COMPLETED", {
+                    "job_id": task.job_id,
+                    "account_id": task.account_id,
+                    "total_targets": task.total_targets,
+                    "success_count": task.success_count,
+                    "fail_count": task.fail_count,
+                    "status": final_status
+                })
 
         finally:
             if client:

@@ -301,18 +301,31 @@ function showAlert({
 }
 
 // WebSocket Connection
+let wsHeartbeatInterval = null;
+
 function initWebSocket() {
+  if (wsHeartbeatInterval) {
+    clearInterval(wsHeartbeatInterval);
+    wsHeartbeatInterval = null;
+  }
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${protocol}//${window.location.host}/ws/live`;
   state.ws = new WebSocket(wsUrl);
 
   state.ws.onopen = () => {
     elements.wsStatus.innerHTML = '<span class="status-dot"></span><span class="status-text">اتصال زنده برقرار است</span>';
+    // Send periodic ping every 20 seconds to prevent connection drops/timeouts
+    wsHeartbeatInterval = setInterval(() => {
+      if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+        state.ws.send('ping');
+      }
+    }, 20000);
   };
 
   state.ws.onmessage = (e) => {
     try {
       const data = JSON.parse(e.data);
+      if (data.event === 'PONG') return;
       handleWebSocketEvent(data.event, data.payload);
     } catch (err) {
       console.error('WS parse error:', err);
@@ -320,6 +333,10 @@ function initWebSocket() {
   };
 
   state.ws.onclose = () => {
+    if (wsHeartbeatInterval) {
+      clearInterval(wsHeartbeatInterval);
+      wsHeartbeatInterval = null;
+    }
     elements.wsStatus.innerHTML = '<span class="status-dot" style="background:#ef4444;box-shadow:none;"></span><span class="status-text" style="color:#ef4444;">اتصال قطع شد (در حال اتصال مجدد...)</span>';
     setTimeout(initWebSocket, 3000);
   };
@@ -357,30 +374,37 @@ function handleWebSocketEvent(event, payload) {
     fetchStats();
     fetchAccounts();
   } else if (event === 'JOB_PROGRESS') {
+    // If the job was deleted or aborted, ignore lingering progress events to prevent resurrection
+    if (!state.activeJobs[payload.job_id]) {
+      return;
+    }
+    const current = state.activeJobs[payload.job_id];
+    const resolvedState = payload.state ? payload.state : (current.state === 'PAUSED' ? 'PAUSED' : 'RUNNING');
     state.activeJobs[payload.job_id] = {
-      ...(state.activeJobs[payload.job_id] || {}),
+      ...current,
       ...payload,
-      state: payload.state || 'RUNNING'
+      state: resolvedState
     };
-    renderActiveJobs();
+    updateActiveJobCard(payload.job_id);
     updateDashboardActiveJobs();
   } else if (event === 'JOB_PAUSED') {
     if (state.activeJobs[payload.job_id]) {
       state.activeJobs[payload.job_id].state = 'PAUSED';
+      updateActiveJobCard(payload.job_id);
+      updateDashboardActiveJobs();
     }
-    renderActiveJobs();
-    updateDashboardActiveJobs();
   } else if (event === 'JOB_RESUMED') {
     if (state.activeJobs[payload.job_id]) {
       state.activeJobs[payload.job_id].state = 'RUNNING';
+      updateActiveJobCard(payload.job_id);
+      updateDashboardActiveJobs();
     }
-    renderActiveJobs();
-    updateDashboardActiveJobs();
   } else if (event === 'JOB_ABORTED' || event === 'JOB_COMPLETED') {
+    const wasExisting = !!state.activeJobs[payload.job_id];
     delete state.activeJobs[payload.job_id];
-    if (event === 'JOB_COMPLETED') {
+    if (event === 'JOB_COMPLETED' && payload.status !== 'ABORTED') {
       showToast(`عملیات پاکسازی با موفقیت انجام شد (${toPersianDigits(payload.success_count || 0)} مورد ترک شد)`, 'success');
-    } else {
+    } else if (wasExisting) {
       showToast('عملیات پاکسازی لغو شد', 'warning');
     }
     renderActiveJobs();
@@ -722,6 +746,63 @@ function renderActiveJobs() {
       </div>
     `;
   }).join('');
+}
+
+function updateActiveJobCard(jobId) {
+  const j = state.activeJobs[jobId];
+  if (!j) {
+    const el = document.getElementById(`card-${jobId}`);
+    if (el) el.remove();
+    const remaining = Object.values(state.activeJobs).filter(x => !['COMPLETED', 'COMPLETED_WITH_ERRORS', 'FAILED', 'ABORTED'].includes(x.state));
+    if (remaining.length === 0) renderActiveJobs();
+    return;
+  }
+
+  const card = document.getElementById(`card-${jobId}`);
+  if (!card) {
+    renderActiveJobs();
+    return;
+  }
+
+  const prog = getJobProgress(j);
+  const isPaused = j.state === 'PAUSED';
+
+  // Update progress bar
+  const fill = card.querySelector('.progress-bar-fill');
+  if (fill) fill.style.width = `${prog.pct}%`;
+
+  // Update status badge
+  const header = card.querySelector('.job-card-header');
+  if (header) {
+    const existingBadge = header.querySelector('.status-badge');
+    const newBadgeHtml = isPaused
+      ? '<span class="status-badge busy" style="background:rgba(234,179,8,0.2); color:#facc15; border:1px solid rgba(234,179,8,0.4); font-size:0.8rem;">⏸️ متوقف موقت</span>'
+      : '<span class="status-badge connected" style="background:rgba(34,197,94,0.15); color:#4ade80; border:1px solid rgba(34,197,94,0.3); font-size:0.8rem;">⚡ در حال اجرا</span>';
+    if (existingBadge) {
+      existingBadge.outerHTML = newBadgeHtml;
+    }
+  }
+
+  // Update footer text
+  const footerText = card.querySelector('.job-card-footer > span');
+  if (footerText) {
+    footerText.innerHTML = `
+      پیشرفت: ${toPersianDigits(prog.pct)}٪ (${toPersianDigits(prog.current)} از ${toPersianDigits(prog.total)})
+      ${j.current_peer_title ? ` • در حال خروج از: <strong>${escapeHtml(j.current_peer_title)}</strong>` : ''}
+    `;
+  }
+
+  // Update pause/resume button if state changed
+  const controls = card.querySelector('.job-controls');
+  if (controls) {
+    const hasPause = controls.querySelector('.btn-job-pause');
+    const hasResume = controls.querySelector('.btn-job-resume');
+    if (isPaused && hasPause) {
+      hasPause.outerHTML = `<button class="btn btn-primary btn-sm btn-job-resume" data-id="${j.job_id}">▶️ ادامه عملیات</button>`;
+    } else if (!isPaused && hasResume) {
+      hasResume.outerHTML = `<button class="btn btn-secondary btn-sm btn-job-pause" data-id="${j.job_id}">⏸️ توقف موقت</button>`;
+    }
+  }
 }
 
 function updateDashboardActiveJobs() {
@@ -1785,7 +1866,7 @@ function setupEventListeners() {
           if (state.activeJobs[jid]) {
             state.activeJobs[jid].state = 'PAUSED';
           }
-          renderActiveJobs();
+          updateActiveJobCard(jid);
           updateDashboardActiveJobs();
           showToast('عملیات به صورت موقت متوقف شد', 'info');
         } else {
@@ -1809,7 +1890,7 @@ function setupEventListeners() {
           if (state.activeJobs[jid]) {
             state.activeJobs[jid].state = 'RUNNING';
           }
-          renderActiveJobs();
+          updateActiveJobCard(jid);
           updateDashboardActiveJobs();
           showToast('عملیات با موفقیت ادامه یافت', 'success');
         } else {
@@ -1839,6 +1920,8 @@ function setupEventListeners() {
           const json = await res.json();
           if (json.success) {
             delete state.activeJobs[jid];
+            const cardEl = document.getElementById(`card-${jid}`);
+            if (cardEl) cardEl.remove();
             renderActiveJobs();
             updateDashboardActiveJobs();
             fetchAccounts();
