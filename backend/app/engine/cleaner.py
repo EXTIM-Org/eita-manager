@@ -3,7 +3,10 @@ import random
 import time
 import uuid
 import json
+import logging
 from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 from typing import Dict, List, Optional, Callable
 from sqlalchemy import select, update
 from app.database.connection import AsyncSessionLocal
